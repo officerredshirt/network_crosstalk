@@ -1,0 +1,64 @@
+Building DAG of jobs...
+Using shell: /usr/sbin/bash
+Provided cores: 12
+Rules claiming more threads will be scaled down.
+Job stats:
+job              count    min threads    max threads
+-------------  -------  -------------  -------------
+all                  1              1              1
+get_crosstalk        3              1              1
+total                4              1              1
+
+Select jobs to execute...
+
+[Fri Aug 19 11:07:25 2022]
+rule get_crosstalk:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dat
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.xtalk
+    jobid: 1
+    reason: Missing output files: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.xtalk
+    wildcards: id=00
+    resources: tmpdir=/tmp
+
+
+[Fri Aug 19 11:07:25 2022]
+rule get_crosstalk:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dat
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.xtalk
+    jobid: 3
+    reason: Missing output files: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.xtalk
+    wildcards: id=01
+    resources: tmpdir=/tmp
+
+
+[Fri Aug 19 11:07:25 2022]
+rule get_crosstalk:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dat
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.xtalk
+    jobid: 5
+    reason: Missing output files: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.xtalk
+    wildcards: id=02
+    resources: tmpdir=/tmp
+
+[Fri Aug 19 11:07:35 2022]
+Finished job 5.
+1 of 4 steps (25%) done
+[Fri Aug 19 11:07:40 2022]
+Finished job 3.
+2 of 4 steps (50%) done
+[Fri Aug 19 11:07:41 2022]
+Finished job 1.
+3 of 4 steps (75%) done
+Select jobs to execute...
+
+[Fri Aug 19 11:07:41 2022]
+localrule all:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.xtalk, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.xtalk, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.xtalk
+    jobid: 0
+    reason: Input files updated by another job: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.xtalk, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.xtalk, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.xtalk
+    resources: tmpdir=/tmp
+
+[Fri Aug 19 11:07:41 2022]
+Finished job 0.
+4 of 4 steps (100%) done
+Complete log: .snakemake/log/2022-08-19T110725.323158.snakemake.log

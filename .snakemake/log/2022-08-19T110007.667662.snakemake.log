@@ -1,0 +1,70 @@
+Building DAG of jobs...
+Using shell: /usr/sbin/bash
+Provided cores: 12
+Rules claiming more threads will be scaled down.
+Job stats:
+job                count    min threads    max threads
+---------------  -------  -------------  -------------
+all                    1              1              1
+get_achievables        3              1              1
+get_crosstalk          3              1              1
+total                  7              1              1
+
+Select jobs to execute...
+
+[Fri Aug 19 11:00:07 2022]
+rule get_achievables:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.arch.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.arch.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.arch.dat
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dat
+    jobid: 2
+    reason: Missing output files: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dat
+    wildcards: id=00
+    resources: tmpdir=/tmp
+
+
+[Fri Aug 19 11:00:07 2022]
+rule get_achievables:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.arch.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.arch.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.arch.dat
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dat
+    jobid: 4
+    reason: Missing output files: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dat, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.bak
+    wildcards: id=01
+    resources: tmpdir=/tmp
+
+
+[Fri Aug 19 11:00:08 2022]
+rule get_achievables:
+    input: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.arch.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.arch.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.arch.dat
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dat
+    jobid: 6
+    reason: Missing output files: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dat
+    wildcards: id=02
+    resources: tmpdir=/tmp
+
+[Fri Aug 19 11:00:08 2022]
+Error in rule get_achievables:
+    jobid: 2
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/00.achieved.dat
+    shell:
+        /mnt/c/Users/mindylp/Documents/python/network_crosstalk/src/get_achievable_patterns.py -i 00
+        (one of the commands exited with non-zero exit code; note that snakemake uses bash strict mode!)
+
+[Fri Aug 19 11:00:08 2022]
+Error in rule get_achievables:
+    jobid: 4
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/01.achieved.dat
+    shell:
+        /mnt/c/Users/mindylp/Documents/python/network_crosstalk/src/get_achievable_patterns.py -i 01
+        (one of the commands exited with non-zero exit code; note that snakemake uses bash strict mode!)
+
+[Fri Aug 19 11:00:08 2022]
+Error in rule get_achievables:
+    jobid: 6
+    output: /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.bak, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dir, /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/02.achieved.dat
+    shell:
+        /mnt/c/Users/mindylp/Documents/python/network_crosstalk/src/get_achievable_patterns.py -i 02
+        (one of the commands exited with non-zero exit code; note that snakemake uses bash strict mode!)
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2022-08-19T110007.667662.snakemake.log

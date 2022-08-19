@@ -1,0 +1,5 @@
+Building DAG of jobs...
+MissingInputException in rule all in line 19 of /mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile:
+Missing input files for rule all:
+    affected files:
+        /mnt/c/Users/mindylp/Documents/python/network_crosstalk/res/None.xtalk

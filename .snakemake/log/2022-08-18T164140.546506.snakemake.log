@@ -1,0 +1,4 @@
+Building DAG of jobs...
+WildcardErrorin line 1 of /mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile:
+Wildcards in input files cannot be determined from output files:
+'id'

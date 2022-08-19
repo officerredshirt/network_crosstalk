@@ -1,0 +1,4 @@
+IndexErrorin line 7 of /mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile:
+list assignment index out of range
+  File "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile", line 9, in <module>
+  File "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile", line 7, in get_ids
