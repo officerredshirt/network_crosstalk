@@ -1,3 +1,0 @@
-WildcardErrorin line 18 of /mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile:
-No values given for wildcard 'id'.
-  File "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile", line 18, in <module>

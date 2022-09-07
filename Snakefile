@@ -1,5 +1,5 @@
-prefix = "kpr-"
-N = 4
+prefix = "tf-"
+N = 2 	# number networks to generate
 
 def get_ids():
 	ids = []
@@ -24,7 +24,7 @@ rule gen_networks:
 	output:
 		expand(RESDIR+"{id}.arch.{ext}",id=IDS,ext=EXT)
 	shell:
-		DIR+f"src/get_networks.py -n {N} -p "+RESDIR+prefix
+		DIR+f"src/get_networks.py -n {N} -p "+RESDIR+prefix+"; cp src/params.py "+RESDIR+prefix+"params.py"
 
 rule get_achievables:
 	input:

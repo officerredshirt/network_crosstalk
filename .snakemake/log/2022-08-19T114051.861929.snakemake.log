@@ -1,4 +1,0 @@
-NameErrorin line 5 of /mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile:
-name 'array' is not defined
-  File "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile", line 9, in <module>
-  File "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/Snakefile", line 5, in get_ids
