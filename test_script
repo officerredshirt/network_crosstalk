@@ -6,7 +6,7 @@ then
 	mkdir $DIR
 fi
 
-fn="$DIR/02"
+fn="$DIR/kpr-00"
 
 echo "Generating network..."
 python3 ./src/gen_network.py -o $fn

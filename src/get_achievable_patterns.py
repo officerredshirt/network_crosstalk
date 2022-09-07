@@ -54,8 +54,14 @@ def main(argv):
         # R: M_enh x N_PF
         # T: M_enh x N_TF
         # G: M_gene x M_enh
-        enhancer_exp_level = (matmul(R,u[0:N_PF])) * (matmul(T,u[N_PF:]))
-        gene_is_on = matmul(G,enhancer_exp_level) > 0
+        if N_PF == 0:
+             enhancer_exp_level = T@u
+             gene_is_on = G@enhancer_exp_level > 0
+        else:
+             enhancer_exp_level = R@u[0:N_PF] * T@u[N_PF:]
+             gene_is_on = G@enhancer_exp_level > 0
+        # enhancer_exp_level = (matmul(R,u[0:N_PF])) * (matmul(T,u[N_PF:]))
+        # gene_is_on = matmul(G,enhancer_exp_level) > 0
         
         # convert achieved pattern to int
         gene_on_int = bool2int(gene_is_on)

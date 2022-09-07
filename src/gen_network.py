@@ -30,9 +30,12 @@ def main(argv):
             filename_out = arg
 
     # generate connections from PF to enhancers
-    R = zeros([M_ENH,N_PF])
-    for ii in range(M_ENH):
-        R[ii,random.randint(0,N_PF-1)] = 1
+    if N_PF != 0:
+        R = zeros([M_ENH,N_PF])
+        for ii in range(M_ENH):
+            R[ii,random.randint(0,N_PF-1)] = 1
+    else:
+        R = array([])
     
     # generate connections from TFs to enhancers
     T = zeros([M_ENH,N_TF])

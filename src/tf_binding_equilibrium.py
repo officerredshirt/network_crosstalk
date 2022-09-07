@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
-
-
 from math import *
 from numpy import *
 
@@ -26,4 +23,3 @@ def pr_gene_on(C,c):
     
     p_off = prod(list(map(pr_cu_wrapper,c)))
     return (1 - p_off)
-

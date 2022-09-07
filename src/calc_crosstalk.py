@@ -56,8 +56,9 @@ def main(argv):
             globals()[key] = ms[key]
             # print(key)
 
-    pr_chromatin_open = dill.load(open("./src/chromatin_6state_pr_open.out", "rb"))
+    # pr_chromatin_open = dill.load(open("./src/chromatin_6state_pr_open.out", "rb"))
     # pr_gene_on is imported with tf_binding_equilibrium
+    pr_chromatin_open = dill.load(open("./src/chromatin_kpr_pr_open.out", "rb"))
 
 
     # note: for loop and map implementations seem equally efficient
@@ -66,14 +67,22 @@ def main(argv):
     R_bool = (R != 0)
     T_bool = (T != 0)
     # TODO: support multiple enhancers per gene
-    def get_gene_exp(c_PF,c_TF):
-        C_PF = sum(c_PF)
-        C_TF = sum(c_TF)
-        
-        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_gene_on(C_TF,c_TF[t])
-        
-        return concatenate(list(map(pr_wrapper,R_bool,T_bool)))
+    if N_PF == 0:   # network is TFs only
+        def get_gene_exp(c_PF,c_TF):
+            C_TF = sum(c_TF)
 
+            pr_wrapper = lambda t: pr_gene_on(C_TF,c_TF[t])
+
+            return list(map(pr_wrapper,T_bool))
+
+    else:
+        def get_gene_exp(c_PF,c_TF):
+            C_PF = sum(c_PF)
+            C_TF = sum(c_TF)
+            
+            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_gene_on(C_TF,c_TF[t])
+        
+            return concatenate(list(map(pr_wrapper,R_bool,T_bool)))
 
     # crosstalk metric
     def crosstalk_metric(x,c_PF,c_TF):
@@ -92,7 +101,7 @@ def main(argv):
 
     # tstart = time.perf_counter()
     for ii, (key, value) in enumerate(mappings.items()):
-        # print(str(f"Current key: {key}"))
+        # print(str(f"key: {key}, value: {value}"))
         if ii >= ndict_entries:
             break
 
@@ -104,9 +113,9 @@ def main(argv):
 
         # optimize concentration of PFs and TFs in the input to reduce crosstalk metric
         def crosstalk_objective_fn(c):
-             return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
+            return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
         bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
-        
+
         optim_results.setdefault(key,[])
 
         def optim(inp):

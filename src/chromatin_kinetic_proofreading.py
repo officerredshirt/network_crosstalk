@@ -14,20 +14,23 @@ sym.init_printing()
 sym.var('pi1 pi2 pi3 pi4 pi5 pi6 pi7 pi8',real=True)
 sym.var('c_S c_NS',real=True)
 
-k_Sp = 1
-k_Sm = 0.1
-k_NSp = 1
-k_NSm = 1
-k_neq = 0.1
-eta = 0.1
-epsilon = 0
-rm = 0.001
+rp = 0
+rm = 0.0002     # s-1
+kh_Sp = 0.0005  # s-1 nM-1
+kh_Sm = 0.005   # s-1
+kh_NSp = 0.0005 # s-1 nM-1
+kh_NSm = 5      # s-1
+k_neq = 0.2     # s-1
+k_Sp = 0.025    # s-1 nM-1
+k_Sm = 0.25     # s-1
+k_NSp = 0.025   # s-1 nM-1
+k_NSm = 250     # s-1
 
-Q = sym.Matrix([[-c_S*k_Sp - c_NS*k_NSp - epsilon, c_S*k_Sp, c_NS*k_NSp, 0, 0, 0, 0, epsilon],
-               [eta*k_Sm, -eta*k_Sm - k_neq, 0, k_neq, 0, 0, 0, 0],
-               [eta*k_NSm, 0, -eta*k_NSm - k_neq, 0, k_neq, 0, 0, 0],
-               [eta*k_Sm, 0, 0, -eta*k_Sm - k_neq, 0, k_neq, 0, 0],
-               [eta*k_NSm, 0, 0, 0, -eta*k_NSm - k_neq, 0, k_neq, 0],
+Q = sym.Matrix([[-c_S*kh_Sp - c_NS*kh_NSp - rp, c_S*kh_Sp, c_NS*kh_NSp, 0, 0, 0, 0, rp],
+               [kh_Sm, -kh_Sm - k_neq, 0, k_neq, 0, 0, 0, 0],
+               [kh_NSm, 0, -kh_NSm - k_neq, 0, k_neq, 0, 0, 0],
+               [kh_Sm, 0, 0, -kh_Sm - k_neq, 0, k_neq, 0, 0],
+               [kh_NSm, 0, 0, 0, -kh_NSm - k_neq, 0, k_neq, 0],
                [0, 0, 0, 0, 0, -k_Sm, 0, k_Sm],
                [0, 0, 0, 0, 0, 0, -k_NSm, k_NSm],
                [rm, 0, 0, 0, 0, c_S*k_Sp, c_NS*k_NSp, -c_S*k_Sp - c_NS*k_NSp - rm]])
@@ -51,4 +54,4 @@ pr_chromatin_open = sym.lambdify((c_NS,c_S),Pi_open,"numpy")
 
 
 dill.settings['recurse'] = True
-dill.dump(pr_chromatin_open, open("chromatin_kpr_pr_open.out", "wb"))
+dill.dump(pr_chromatin_open, open("src/chromatin_kpr_pr_open.out", "wb"))
