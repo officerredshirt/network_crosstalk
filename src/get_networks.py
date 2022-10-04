@@ -4,6 +4,7 @@ from numpy import *
 import shelve
 import sys, getopt
 import os
+# import time
 
 from params import *
 
@@ -30,8 +31,11 @@ def main(argv):
             fnprefix = arg
 
     # call gen_network n times
+    # tic = time.perf_counter()
     for fn in range(num_networks):
         os.system("python3 ./src/gen_network.py -o " + fnprefix + f"{fn:06}")
+    # toc = time.perf_counter()
+    # print(f"elapsed time: {toc-tic} s, approx {(toc-tic)/num_networks} per network")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

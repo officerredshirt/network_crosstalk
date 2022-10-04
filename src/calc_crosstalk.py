@@ -6,9 +6,10 @@ from scipy import optimize
 from multiprocess import Pool
 import shelve
 import dill
-import time
+# import time
 import matplotlib.pyplot as plt
 import sys, getopt
+# from memory_profiler import profile, memory_usage
 
 from params import *
 from tf_binding_equilibrium import *
@@ -18,8 +19,9 @@ from boolarr import *
 def print_usage():
     print("usage is: calc_crosstalk -i <filename_in> -n <ndict_entries>")
 
-
+# @profile
 def main(argv):
+    # mem_usage = memory_usage(-1, interval=.2, timeout=1, max_usage=True, include_children=True)
     filename_in = ""
     ndict_entries = inf
 
@@ -153,6 +155,7 @@ def main(argv):
 
     # tend = time.perf_counter()
     # print(f"elapsed time = {tend - tstart}")
+    # print(f"memory usage = {mem_usage}")
 
 
     dill.dump(optim_results, open(filename_in + ".xtalk", "wb"))

@@ -5,6 +5,7 @@ from multiprocess import Pool
 import random as ran
 import shelve
 import sys, getopt
+# import time
 
 from params import *
 from boolarr import *
@@ -35,6 +36,7 @@ def main(argv):
         elif opt == "-i":
             filename_in = arg
 
+    # tic = time.perf_counter()
 
     # load architecture
     with shelve.open(filename_in + ".arch") as ms:
@@ -58,7 +60,7 @@ def main(argv):
              enhancer_exp_level = T@u
              gene_is_on = G@enhancer_exp_level > 0
         else:
-             enhancer_exp_level = R@u[0:N_PF] * T@u[N_PF:]
+             enhancer_exp_level = (R@u[0:N_PF]) * (T@u[N_PF:])
              gene_is_on = G@enhancer_exp_level > 0
         # enhancer_exp_level = (matmul(R,u[0:N_PF])) * (matmul(T,u[N_PF:]))
         # gene_is_on = matmul(G,enhancer_exp_level) > 0
@@ -74,6 +76,9 @@ def main(argv):
     with shelve.open(filename_in + ".achieved",'n') as ms_out:
         ms_out['inputs_to_test'] = inputs_to_test
         ms_out['mappings'] = mappings
+
+    # toc = time.perf_counter()
+    # print(f"elapsed time: {toc-tic} s, {len(inputs_to_test)} inputs")
 
 
 if __name__ == "__main__":

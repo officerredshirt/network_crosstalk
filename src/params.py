@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # ARCHITECTURE
-N_PF = 0#5      # number pioneer factors
+N_PF = 5      # number pioneer factors
 N_TF = 10     # number transcription factors
 M_ENH = 100   # number enhancers
 M_GENE = 100  # number genes

@@ -1,5 +1,6 @@
-prefix = "tf-"
-N = 2 	# number networks to generate
+# prefix = "tf-"   # when TF-only network
+prefix = "kpr-"   # chromatin (kinetic proofreading)
+N = 5 	# number networks to generate
 
 def get_ids():
 	ids = []
@@ -11,7 +12,7 @@ IDS = get_ids()
 EXT = ["dir","bak","dat"]
 
 DIR = "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/"
-RESDIR = DIR+"res/"
+RESDIR = DIR+"test_res/"
 
 wildcard_constraints:
 	id = prefix+"\d+"
@@ -25,6 +26,7 @@ rule gen_networks:
 		expand(RESDIR+"{id}.arch.{ext}",id=IDS,ext=EXT)
 	shell:
 		DIR+f"src/get_networks.py -n {N} -p "+RESDIR+prefix+"; cp src/params.py "+RESDIR+prefix+"params.py"
+
 
 rule get_achievables:
 	input:
@@ -40,5 +42,7 @@ rule get_crosstalk:
 		RESDIR+"{id}.achieved.bak", RESDIR+"{id}.achieved.dir", RESDIR+"{id}.achieved.dat"
 	output:
 		RESDIR+"{id}.xtalk"
+	resources:
+		mem_mb = 130
 	shell:
 		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 1"
