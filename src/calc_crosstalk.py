@@ -98,17 +98,15 @@ def main(argv):
         print("ndict_entries must be strictly positive")
         sys.exit(2)
         
-    eps = 1e-6   # tolerance for optimization
+    eps = 1e-3   # tolerance for optimization
     optim_results = {}
 
     # tstart = time.perf_counter()
-    for ii, (key, value) in enumerate(mappings.items()):
+    for ii, key in enumerate(mappings.keys()):
         # print(str(f"key: {key}, value: {value}"))
         if ii >= ndict_entries:
             break
 
-        print(ii,end="")
-        sys.stdout.flush()
         achieved_pattern = int2bool(key,M_GENE)
         target_pattern = zeros(M_GENE)
         target_pattern[achieved_pattern] = 1
@@ -120,38 +118,14 @@ def main(argv):
 
         optim_results.setdefault(key,[])
 
-        def optim(inp):
-            print("", end=".")
-            sys.stdout.flush()
-            
-            # starting point
-            c_0_bool = int2bool(inp,N_PF + N_TF)
-            c_0 = zeros(N_PF + N_TF)
-            c_0[c_0_bool] = 1
+        # starting point
+        # c_0_bool = int2bool(inp,N_PF + N_TF)
+        c_0 = ones(N_PF + N_TF)
+        # c_0[c_0_bool] = 1
 
-            A = identity(N_PF + N_TF)
-            A = delete(A, c_0_bool, axis = 0)
-            
-            if len(A) != 0:
-                cons = {optimize.LinearConstraint(A,0,0)}   # force solution to follow form of given input
-                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds, constraints = cons)
-            else:
-                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
+        optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
 
-            print("", end="!")
-            sys.stdout.flush()
-                
-            # optim_results[key].append(optres)
-            return optres
-
-        if __name__ == "__main__":
-            with Pool() as pool:
-                all_optres = pool.map(optim,value)
-
-            print("")
-
-            for res in all_optres:
-                optim_results[key].append(res)
+        optim_results[key].append(optres)
 
     # tend = time.perf_counter()
     # print(f"elapsed time = {tend - tstart}")

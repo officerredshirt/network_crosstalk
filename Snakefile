@@ -1,6 +1,6 @@
 # prefix = "tf-"   # when TF-only network
-prefix = "kpr-"   # chromatin (kinetic proofreading)
-N = 5 	# number networks to generate
+prefix = "test-"   # chromatin (kinetic proofreading)
+N = 1 	# number networks to generate
 
 def get_ids():
 	ids = []
@@ -45,4 +45,4 @@ rule get_crosstalk:
 	resources:
 		mem_mb = 130
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 1"
+		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 3"
