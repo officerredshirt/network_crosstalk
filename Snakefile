@@ -45,4 +45,4 @@ rule get_crosstalk:
 	resources:
 		mem_mb = 130
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 3"
+		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 4"

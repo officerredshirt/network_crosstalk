@@ -9,6 +9,7 @@ import dill
 # import time
 import matplotlib.pyplot as plt
 import sys, getopt
+from os.path import exists
 # from memory_profiler import profile, memory_usage
 
 from params import *
@@ -99,7 +100,14 @@ def main(argv):
         sys.exit(2)
         
     eps = 1e-3   # tolerance for optimization
-    optim_results = {}
+
+    filename_out = filename_in + ".xtalk"
+
+    if exists(filename_out + ".tmp"):
+        print("loading partial results")
+        optim_results = dill.load(open(filename_out + ".tmp","rb"))
+    else:
+        optim_results = {}
 
     # tstart = time.perf_counter()
     for ii, key in enumerate(mappings.keys()):
@@ -116,23 +124,27 @@ def main(argv):
             return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
         bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
 
-        optim_results.setdefault(key,[])
+        if ((key in optim_results) and (size(optim_results[key]) > 0)):
+            # print(f"skipping xtalk for {key}")
+        else:
+            optim_results.setdefault(key,[])
 
-        # starting point
-        # c_0_bool = int2bool(inp,N_PF + N_TF)
-        c_0 = ones(N_PF + N_TF)
-        # c_0[c_0_bool] = 1
-
-        optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
-
-        optim_results[key].append(optres)
+            # starting point
+            # c_0_bool = int2bool(inp,N_PF + N_TF)
+            c_0 = ones(N_PF + N_TF)
+            # c_0[c_0_bool] = 1
+    
+            optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
+    
+            optim_results[key].append(optres)
+            dill.dump(optim_results, open(filename_out + ".tmp", "wb"))
 
     # tend = time.perf_counter()
     # print(f"elapsed time = {tend - tstart}")
     # print(f"memory usage = {mem_usage}")
 
 
-    dill.dump(optim_results, open(filename_in + ".xtalk", "wb"))
+    dill.dump(optim_results, open(filename_out, "wb"))
 
 
 if __name__ == "__main__":
