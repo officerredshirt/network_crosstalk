@@ -124,9 +124,10 @@ def main(argv):
             return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
         bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
 
-        if ((key in optim_results) and (size(optim_results[key]) > 0)):
+        if not((key in optim_results) and (size(optim_results[key]) > 0)):
+        # if((key in optim_results) and (size(optim_results[key]) > 0)):
             # print(f"skipping xtalk for {key}")
-        else:
+        # else:
             optim_results.setdefault(key,[])
 
             # starting point
