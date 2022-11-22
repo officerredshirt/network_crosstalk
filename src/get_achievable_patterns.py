@@ -11,15 +11,17 @@ from params import *
 from boolarr import *
 
 def print_usage():
-    print("usage is: get_achievable_patterns.py -i <filename_in>")
+    print("usage is: get_achievable_patterns.py -m -i <filename_in>")
 
 
 # here logical vectors are often treated as binary strings and represented as integers up to 2^VEC_LENGTH
 def main(argv):
     filename_in = ""
+    thresh_gene_on = 0
+    suffix = ""
 
     try:
-        opts, args = getopt.getopt(argv,"hi:")
+        opts, args = getopt.getopt(argv,"hmi:")
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -35,6 +37,10 @@ def main(argv):
             sys.exit()
         elif opt == "-i":
             filename_in = arg
+        elif opt in ("-m", "--max"):
+            # require all TFs to be present to activate gene
+            thresh_gene_on = THETA-1 # strictly greater than this
+            suffix = ".max"
 
     # tic = time.perf_counter()
 
@@ -58,10 +64,10 @@ def main(argv):
         # G: M_gene x M_enh
         if N_PF == 0:
              enhancer_exp_level = T@u
-             gene_is_on = G@enhancer_exp_level > 0
+             gene_is_on = G@enhancer_exp_level > thresh_gene_on 
         else:
              enhancer_exp_level = (R@u[0:N_PF]) * (T@u[N_PF:])
-             gene_is_on = G@enhancer_exp_level > 0
+             gene_is_on = G@enhancer_exp_level > thresh_gene_on
         # enhancer_exp_level = (matmul(R,u[0:N_PF])) * (matmul(T,u[N_PF:]))
         # gene_is_on = matmul(G,enhancer_exp_level) > 0
         
@@ -72,8 +78,7 @@ def main(argv):
         mappings.setdefault(gene_on_int,[])
         mappings[gene_on_int].append(u_int)
 
-
-    with shelve.open(filename_in + ".achieved",'n') as ms_out:
+    with shelve.open(filename_in + ".achieved" + suffix,'n') as ms_out:
         ms_out['inputs_to_test'] = inputs_to_test
         ms_out['mappings'] = mappings
 
@@ -83,3 +88,4 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+    exit(0)

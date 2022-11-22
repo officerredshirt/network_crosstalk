@@ -12,7 +12,7 @@ def print_usage():
 
 # TODO:
 # [ ] assign connections according to particular distributions
-# [ ] correct to ensure all PFs/TFs(/enhancers) are connected to at least one enhancer(/gene)
+# [ ] allow more than one gene per enhancer
 
 def main(argv):
     filename_out = "architecture.out"
@@ -29,24 +29,30 @@ def main(argv):
         elif opt == "-o":
             filename_out = arg
 
-    # generate connections from PF to enhancers
-    if N_PF != 0:
-        R = zeros([M_ENH,N_PF])
+    is_pathological = True
+
+    while is_pathological:
+
+        # generate connections from PF to enhancers
+        if N_PF != 0:
+            R = zeros([M_ENH,N_PF])
+            for ii in range(M_ENH):
+                R[ii,random.randint(0,N_PF)] = 1
+        else:
+            R = array([])
+        
+        # generate connections from TFs to enhancers
+        T = zeros([M_ENH,N_TF])
+        temp = concatenate((ones(THETA),zeros(N_TF - THETA)))
         for ii in range(M_ENH):
-            R[ii,random.randint(0,N_PF-1)] = 1
-    else:
-        R = array([])
-    
-    # generate connections from TFs to enhancers
-    T = zeros([M_ENH,N_TF])
-    temp = concatenate((ones(THETA),zeros(N_TF - THETA)))
-    for ii in range(M_ENH):
-        T[ii,] = random.permutation(temp)
-    
-    # generate connections from enhancers to genes
-    # trivial for now (one gene per enhancer)
-    G = identity(M_GENE)
-    
+            T[ii,] = random.permutation(temp)
+        
+        # generate connections from enhancers to genes
+        # trivial for now (one gene per enhancer)
+        G = identity(M_GENE)
+
+        is_pathological = any(sum(T,axis=0) < 1) or ((len(R) > 0) and any(sum(R,axis=0) < 1))
+        
     
     # -- SAVE ARCHITECTURE TO FILE -- #
     with shelve.open(filename_out + ".arch",'n') as ms:
