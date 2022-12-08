@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 from numpy import *
+import shelve
 import sys, getopt
-import manage_db
 
 from params import *
 
 def print_usage():
-    print("usage is: gen_network.py -o <filename_out> -d <database>")
+    print("usage is: gen_network.py -o <filename_out>")
 
 
 # TODO:
@@ -15,11 +15,10 @@ def print_usage():
 # [ ] allow more than one gene per enhancer
 
 def main(argv):
-    filename_out = "out.arch"
-    database = "temp.db"
+    filename_out = "architecture.out"
 
     try:
-        opts, args = getopt.getopt(argv,"ho:d:")
+        opts, args = getopt.getopt(argv,"ho:")
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -29,11 +28,6 @@ def main(argv):
             sys.exit()
         elif opt == "-o":
             filename_out = arg
-        elif opt == "-d":
-            database = arg
-
-    print(filename_out)
-    assert not(database == "temp.db"), "database not passed correctly"
 
     is_pathological = True
 
@@ -59,16 +53,13 @@ def main(argv):
 
         is_pathological = any(sum(T,axis=0) < 1) or ((len(R) > 0) and any(sum(R,axis=0) < 1))
         
-
-    # -- UPLOAD ARCHITECTURE TO DATABASE -- #
-    local_id = manage_db.extract_local_id(filename_out)
-    manage_db.add_network(database,local_id,R,G,T)
-
-
-    # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
-    with open(filename_out + ".arch","w") as file:
-        pass
     
+    # -- SAVE ARCHITECTURE TO FILE -- #
+    with shelve.open(filename_out + ".arch",'n') as ms:
+        ms['R'] = R
+        ms['T'] = T
+        ms['G'] = G
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

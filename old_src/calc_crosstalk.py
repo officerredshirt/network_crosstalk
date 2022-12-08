@@ -4,6 +4,7 @@
 from numpy import *
 from scipy import optimize
 from multiprocess import Pool
+import shelve
 import dill
 # import time
 import matplotlib.pyplot as plt
@@ -15,21 +16,18 @@ from params import *
 from tf_binding_equilibrium import *
 from boolarr import *
 
-import manage_db
-
 
 def print_usage():
-    print("usage is: calc_crosstalk -i <filename_in> -n <npatterns> -d <database>")
+    print("usage is: calc_crosstalk -i <filename_in> -n <ndict_entries>")
 
 # @profile
 def main(argv):
     # mem_usage = memory_usage(-1, interval=.2, timeout=1, max_usage=True, include_children=True)
     filename_in = ""
-    npatterns = inf
-    database = "temp.db"
+    ndict_entries = inf
 
     try:
-        opts, args = getopt.getopt(argv,"hi:n:d:")
+        opts, args = getopt.getopt(argv,"hi:n:")
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -46,22 +44,28 @@ def main(argv):
         elif opt == "-i":
             filename_in = arg
         elif opt == "-n":
-            npatterns = int(arg)
-        elif opt == "-d":
-            database = arg
+            ndict_entries = int(arg)
 
-
-    local_id = manage_db.extract_local_id(filename_in)
 
     # load architecture
-    R, T, G = manage_db.get_network(database,local_id)
+    with shelve.open(filename_in + ".arch") as ms:
+        for key in ms:
+            globals()[key] = ms[key]
+            # print(key)
 
     # load achievable patterns
-    achievable_patterns = manage_db.get_achieved_patterns(database,local_id)
+    with shelve.open(filename_in + ".achieved") as ms:
+        for key in ms:
+            globals()[key] = ms[key]
+            # print(key)
 
+    # pr_chromatin_open = dill.load(open("./src/chromatin_6state_pr_open.out", "rb"))
     # pr_gene_on is imported with tf_binding_equilibrium
     pr_chromatin_open = dill.load(open("./src/chromatin_kpr_pr_open.out", "rb"))
 
+
+    # note: for loop and map implementations seem equally efficient
+    # TODO: support multiple enhancers per gene
 
     R_bool = (R != 0)
     T_bool = (T != 0)
@@ -89,40 +93,59 @@ def main(argv):
         return transpose(d)@d
 
 
-    if npatterns > len(achievable_patterns):
-        npatterns = len(achievable_patterns)
-    elif npatterns < 1:
-        print("npatterns must be strictly positive")
+    if ndict_entries > len(mappings):
+        ndict_entries = len(mappings)
+    elif ndict_entries < 1:
+        print("ndict_entries must be strictly positive")
         sys.exit(2)
         
     eps = 1e-3   # tolerance for optimization
 
+    filename_out = filename_in + ".xtalk"
+
+    if exists(filename_out + ".tmp"):
+        print("loading partial results")
+        optim_results = dill.load(open(filename_out + ".tmp","rb"))
+    else:
+        optim_results = {}
+
     # tstart = time.perf_counter()
-    for ii, target_pattern in enumerate(achievable_patterns):
-        if ii >= npatterns:
+    for ii, key in enumerate(mappings.keys()):
+        # print(str(f"key: {key}, value: {value}"))
+        if ii >= ndict_entries:
             break
+
+        achieved_pattern = int2bool(key,M_GENE)
+        target_pattern = zeros(M_GENE)
+        target_pattern[achieved_pattern] = 1
 
         # optimize concentration of PFs and TFs in the input to reduce crosstalk metric
         def crosstalk_objective_fn(c):
             return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
-
         bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
 
-        if not(manage_db.xtalk_result_found(database,local_id,target_pattern)):
-            # starting point
-            c_0 = ones(N_PF + N_TF)
-            optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
-            output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
-            manage_db.add_xtalk(database,local_id,target_pattern,optres,output_expression)
-    
+        if not((key in optim_results) and (size(optim_results[key]) > 0)):
+        # if((key in optim_results) and (size(optim_results[key]) > 0)):
+            # print(f"skipping xtalk for {key}")
+        # else:
+            optim_results.setdefault(key,[])
 
-    # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
-    with open(filename_in + ".xtalk","w") as file:
-        pass
+            # starting point
+            # c_0_bool = int2bool(inp,N_PF + N_TF)
+            c_0 = ones(N_PF + N_TF)
+            # c_0[c_0_bool] = 1
+    
+            optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
+    
+            optim_results[key].append(optres)
+            dill.dump(optim_results, open(filename_out + ".tmp", "wb"))
 
     # tend = time.perf_counter()
     # print(f"elapsed time = {tend - tstart}")
     # print(f"memory usage = {mem_usage}")
+
+
+    dill.dump(optim_results, open(filename_out, "wb"))
 
 
 if __name__ == "__main__":

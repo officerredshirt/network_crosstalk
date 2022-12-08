@@ -3,9 +3,9 @@
 
 # ARCHITECTURE
 N_PF = 2#5      # number pioneer factors
-N_TF = 3#10     # number transcription factors
-M_ENH = 10#100   # number enhancers
-M_GENE = 10#100  # number genes
+N_TF = 5#10     # number transcription factors
+M_ENH = 50#100   # number enhancers
+M_GENE = 50#100  # number genes
 THETA = 2#3     # number TFs per enhancer
 n = 3         # number binding sites per TF
 

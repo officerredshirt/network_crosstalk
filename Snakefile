@@ -1,48 +1,52 @@
-# prefix = "tf-"   # when TF-only network
-prefix = "test-"   # chromatin (kinetic proofreading)
-N = 1 	# number networks to generate
+import datetime
+
+N = 2 	# number networks to generate
 
 def get_ids():
 	ids = []
 	for i in range(N):
-		ids.append(prefix + f"{i:06}")
+		ids.append(f"{i:06}")
 	return ids
 
 IDS = get_ids()
-EXT = ["dir","bak","dat"]
 
 DIR = "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/"
 RESDIR = DIR+"test_res/"
 
+DATABASE_PATH = RESDIR + "local_db.db"
+
+TIMESTAMP = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+CLUSTER_DIR = "cluster_" + TIMESTAMP
+
 wildcard_constraints:
-	id = prefix+"\d+"
+	id = "\d+"
 
 rule all:
 	input:
 		expand(RESDIR+"{id}.xtalk",id=IDS)
+	shell:
+		"mkdir "+CLUSTER_DIR+"; cp -r Snakefile "+DIR+"src sm.sh " +CLUSTER_DIR+"||:; mv -b "+RESDIR+" "+CLUSTER_DIR
 
 rule gen_networks:
 	output:
-		expand(RESDIR+"{id}.arch.{ext}",id=IDS,ext=EXT)
+		expand(RESDIR+"{id}.arch",id=IDS)
 	shell:
-		DIR+f"src/get_networks.py -n {N} -p "+RESDIR+prefix+"; cp src/params.py "+RESDIR+prefix+"params.py"
+		DIR+f"src/get_networks.py -n {N} -p "+RESDIR+" -d "+DATABASE_PATH 
 
 
 rule get_achievables:
 	input:
-		RESDIR+"{id}.arch.bak", RESDIR+"{id}.arch.dir", RESDIR+"{id}.arch.dat"
+		RESDIR+"{id}.arch"
 	output:
-		expand(RESDIR+"{id}.achieved.{ext}",ext=EXT,allow_missing=True)
+		expand(RESDIR+"{id}.achieved",allow_missing=True)
 	shell:
-		DIR+"src/get_achievable_patterns.py -i "+RESDIR+"{wildcards.id}"
+		DIR+"src/get_achievable_patterns.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
 
 
 rule get_crosstalk:
 	input:
-		RESDIR+"{id}.achieved.bak", RESDIR+"{id}.achieved.dir", RESDIR+"{id}.achieved.dat"
+		RESDIR+"{id}.achieved"
 	output:
 		RESDIR+"{id}.xtalk"
-	resources:
-		mem_mb = 130
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 4"
+		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 3 -d "+DATABASE_PATH
