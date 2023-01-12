@@ -40,22 +40,22 @@ def main(argv):
     # TODO: fix manage_db to print these nicely
     print("PARAMETERS")
     res = manage_db.query_db(database,"SELECT * FROM parameters")
-    manage_db.print_res(database,"parameters",res)
+    manage_db.print_res("parameters",res)
     print("")
 
     print("NETWORKS")
     res = manage_db.query_db(database,"SELECT * FROM networks")
-    manage_db.print_res(database,"networks",res)
+    manage_db.print_res("networks",res)
     print("")
 
     print("PATTERNS")
     res = manage_db.query_db(database,"SELECT * FROM patterns")
-    manage_db.print_res(database,"patterns",res)
+    manage_db.print_res("patterns",res)
     print("")
     
     print("XTALK")
-    res = manage_db.query_db(database,"SELECT network_rowid, target_pattern, optimized_input, output_expression FROM xtalk")
-    manage_db.print_res(database,"xtalk",res)
+    res = manage_db.query_db(database,"SELECT * FROM xtalk")
+    manage_db.print_res("xtalk",res)
     print("")
     
     con.close()
