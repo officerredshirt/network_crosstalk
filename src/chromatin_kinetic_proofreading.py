@@ -14,12 +14,25 @@ sym.init_printing()
 sym.var('pi1 pi2 pi3 pi4 pi5 pi6 pi7 pi8',real=True)
 sym.var('c_S c_NS',real=True)
 
+"""
 rp = 0
 rm = 0.0002     # s-1
 kh_Sp = 0.0005  # s-1 nM-1
 kh_Sm = 0.005   # s-1
 kh_NSp = 0.0005 # s-1 nM-1
 kh_NSm = 5      # s-1
+k_neq = 0.2     # s-1
+k_Sp = 0.025    # s-1 nM-1
+k_Sm = 0.25     # s-1
+k_NSp = 0.025   # s-1 nM-1
+k_NSm = 250     # s-1
+"""
+rp = 0
+rm = 0.0002     # s-1
+kh_Sp = 0.0005  # s-1 nM-1
+kh_Sm = 0.005   # s-1
+kh_NSp = 0.0005 # s-1 nM-1
+kh_NSm = 75     # s-1  **this appears to be the most important for proper proofreading
 k_neq = 0.2     # s-1
 k_Sp = 0.025    # s-1 nM-1
 k_Sm = 0.25     # s-1
