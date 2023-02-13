@@ -32,6 +32,7 @@ def main(argv):
     parser.add_argument("prefix")
     parser.add_argument("-s","--scenarios",type=int,nargs='+',default=range(1,8))
     parser.add_argument("-o","--optimize",dest="optimize_xtalk",action="store_true",default=False)
+    parser.add_argument("-x","--crosslayer_crosstalk",dest="crosslayer_crosstalk",action="store_true",default=False)
 
     args = parser.parse_args()
     folder = args.folder
@@ -40,6 +41,7 @@ def main(argv):
     prefix = args.prefix
     scenarios = args.scenarios
     optimize_xtalk = args.optimize_xtalk
+    crosslayer_crosstalk = args.crosslayer_crosstalk
 
     mplstyle.use('fast')
 
@@ -61,7 +63,7 @@ def main(argv):
     
 
     # generate range of concentrations to plot
-    Cl1_set, Cl2_set = np.meshgrid(np.logspace(-1,8,npts), np.logspace(-1,6,npts), indexing='xy')
+    Cl1_set, Cl2_set = np.meshgrid(np.logspace(-1,8,npts), np.logspace(-1,8,npts), indexing='xy')
     
 
     # functions for generating plots
@@ -86,10 +88,12 @@ def main(argv):
         ax.set_ylabel("layer 2 concentration")
         ax.set_xscale("log")
         ax.set_yscale("log")
+        title_str = "crosstalk"
         if optimal_xtalk is not None:
-            ax.set_title(f"crosstalk (minimum = {optimal_xtalk:.5f})")
-        else:
-            ax.set_title("crosstalk")
+            title_str = title_str + f" (minimum = {optimal_xtalk:.5f})"
+        if crosslayer_crosstalk:
+            title_str = title_str + ", cross-layer allowed"
+        ax.set_title(title_str)
         plt.savefig(os.path.join(folder,f"{filename}.png"))
 
     def gen_bar_expression_level(num,C,filename):
@@ -116,45 +120,73 @@ def main(argv):
                 entries_on = [1,0]
                 coeffs = [N_ON,N_OFF]
                 labs = [f"ON ({N_ON})",f"OFF ({M-N_ON})"]
-                return entries_on, coeffs, (pr_layer1(Cl1,cl1)*pr_layer2(Cl2,cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,cl1)*pr_layer2(C,cl2),pr_layer1(C,0)*pr_layer2(C,0)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,cl1)*pr_layer2(Cl2,cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0)), labs
         elif num == 2:          # N_ON genes ON that share same PF, N_OFF genes OFF, unique TF for each gene
             def fn(Cl1,Cl2):
                 cl2 = Cl2/N_ON
                 entries_on = [1,0]
                 coeffs = [N_ON,N_OFF]
                 labs = [f"ON ({N_ON})",f"OFF ({M-N_ON})"]
-                return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,Cl1)*pr_layer2(C,cl2),pr_layer1(C,0)*pr_layer2(C,0)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0)), labs
         elif num == 3:          # N_ON genes ON that share same PF, N_OFF_shared genes OFF that also share this PF
             def fn(Cl1,Cl2):
                 cl2 = Cl2/N_ON
                 entries_on = [1,0,0]
                 coeffs = [N_ON, N_OFF - N_OFF_shared, N_OFF_shared]
                 labs = [f"ON ({N_ON})",f"OFF ({M-N_ON-N_OFF_shared})",f"OFF, shared PF w/ ON ({N_OFF_shared})"]
-                return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0),pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,0)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,Cl1)*pr_layer2(C,cl2),pr_layer1(C,0)*pr_layer2(C,0),pr_layer1(C,Cl1)*pr_layer2(C,0)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0),pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,0)), labs
         elif num == 4:          # 4-gene uniquely addressed network, one gene ON
             def fn(Cl1,Cl2):
                 entries_on = [1,0,0,0]
                 coeffs = [1,1,1,1]
                 labs = ["ON","OFF, shared PF w/ ON","OFF, shared TF w/ ON","OFF, no overlap w/ ON"]
-                return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,Cl2),pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,0),pr_layer1(Cl1,0)*pr_layer2(Cl2,Cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,Cl1)*pr_layer2(C,Cl2),pr_layer1(C,Cl1)*pr_layer2(C,0),pr_layer1(C,0)*pr_layer2(C,Cl2),pr_layer1(C,0)*pr_layer2(C,0)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,Cl2),pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,0),pr_layer1(Cl1,0)*pr_layer2(Cl2,Cl2),pr_layer1(Cl1,0)*pr_layer2(Cl2,0)), labs
         elif num == 5:
             def fn(Cl1,Cl2):    # 4-gene uniquely addressed network, 2 genes ON that share PF
                 entries_on = [1,0]
                 coeffs = [2,2]
                 labs = ["ON, shared PF","OFF"]
-                return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,Cl2/2),pr_layer1(Cl1,0)*pr_layer2(Cl2,Cl2/2)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,Cl1)*pr_layer2(C,Cl2/2),pr_layer1(C,0)*pr_layer2(C,Cl2/2)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,Cl1)*pr_layer2(Cl2,Cl2/2),pr_layer1(Cl1,0)*pr_layer2(Cl2,Cl2/2)), labs
         elif num == 6:
             def fn(Cl1,Cl2):    # 4-gene uniquely addressed network, 2 genes ON that share TF
                 entries_on = [1,0]
                 coeffs = [2,2]
                 labs = ["ON, shared TF","OFF"]
-                return entries_on, coeffs, (pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,Cl2),pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,0)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,Cl1/2)*pr_layer2(C,Cl2),pr_layer1(C,Cl1/2)*pr_layer2(C,0)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,Cl2),pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,0)), labs
         elif num == 7:
             def fn(Cl1,Cl2):    # 4-gene uniquely addressed network, 2 genes ON that do not share PF or TF (not an achievable pattern)
                 entries_on = [1,0]
                 coeffs = [2,2]
                 labs = ["ON, no overlap","OFF"]
-                return entries_on, coeffs, (pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,Cl2/2),pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,Cl2/2)), labs
+                if crosslayer_crosstalk:
+                    C = Cl1+Cl2
+                    return entries_on, coeffs, (pr_layer1(C,Cl1/2)*pr_layer2(C,Cl2/2),pr_layer1(C,Cl1/2)*pr_layer2(C,Cl2/2)), labs
+                else:
+                    return entries_on, coeffs, (pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,Cl2/2),pr_layer1(Cl1,Cl1/2)*pr_layer2(Cl2,Cl2/2)), labs
         else:
             printf(f"no scenario number {num}")
             sys.exit(2)

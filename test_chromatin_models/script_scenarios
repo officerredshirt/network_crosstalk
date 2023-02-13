@@ -1,0 +1,10 @@
+#! /usr/bin/bash
+
+DIR=$(date +%F__%H_%M_%S)
+echo $DIR
+
+python3 ./src/fn_gen_models.py $DIR
+python3 ./src/fn_simple_scenarios.py $DIR tf_chrom_equiv_pr_bound.out tf_pr_bound.out tfeq-tf -o -x
+python3 ./src/fn_simple_scenarios.py $DIR kpr_pr_open.out tf_pr_bound.out kpr-tf -o -x
+
+echo "Done."
