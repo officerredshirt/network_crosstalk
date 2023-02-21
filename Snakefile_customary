@@ -1,9 +1,17 @@
 import datetime
 
-IDS = [f"{0:06}"] # NOTE this is hard-coded in later
+N = 2 	# number networks to generate
+
+def get_ids():
+	ids = []
+	for i in range(N):
+		ids.append(f"{i:06}")
+	return ids
+
+IDS = get_ids()
 
 DIR = "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/"
-RESDIR = DIR+"res/"
+RESDIR = DIR+"test_res/"
 
 DATABASE_PATH = RESDIR + "local_db.db"
 
@@ -23,7 +31,7 @@ rule gen_networks:
 	output:
 		expand(RESDIR+"{id}.arch",id=IDS)
 	shell:
-		DIR+f"src/ss_gen_network.py -o "+RESDIR+"{IDS} -d "+DATABASE_PATH 
+		DIR+f"src/get_networks.py -n {N} -p "+RESDIR+" -d "+DATABASE_PATH 
 
 
 rule get_achievables:
@@ -32,7 +40,7 @@ rule get_achievables:
 	output:
 		expand(RESDIR+"{id}.achieved",allow_missing=True)
 	shell:
-		DIR+"src/ss_get_achievable_patterns.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/get_achievable_patterns.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
 
 
 rule get_crosstalk:
@@ -41,4 +49,4 @@ rule get_crosstalk:
 	output:
 		RESDIR+"{id}.xtalk"
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -n 3 -d "+DATABASE_PATH

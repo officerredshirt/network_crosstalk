@@ -2,22 +2,24 @@ import sqlite3
 import params
 import os
 from numpy import *
+import matplotlib.pyplot as plt
 
 def extract_local_id(filename):
     return int(os.path.splitext(os.path.basename(filename))[0])
 
 # Initialize the parameter, network, pattern, and crosstalk tables in the database.
 def init_tables(db_filename,db_type="child"):
+    assert not(os.path.exists(db_filename)), "database already exists"
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
-
-    assert not(os.path.exists("database " + db_filename + " already exists")), "database already exists"
 
     ### GENERATE TABLES OF PARAMETERS, NETWORKS, PATTERNS, XTALK ###
     cur.execute("CREATE TABLE parameters(N_PF,N_TF,M_ENH,M_GENE,THETA,n,K_S,K_NS,n0,NUM_RANDINPUTS)")
     cur.execute("CREATE TABLE networks(parameter_rowid,local_id,R,G,T)")
     if db_type == "parent":
         cur.execute("ALTER TABLE parameters ADD COLUMN folder")
+    elif db_type == "child":
+        pass
     else:
         print("unrecognized database type "+db_type)
         return 1
@@ -66,6 +68,7 @@ def add_network(db_filename,local_id,R,G,T):
     con.close()
     return 0
 
+# Return network architecture with specified id.
 def get_network(db_filename,local_id):
     if not(os.path.exists(db_filename)):
         print("error getting network: "+db_filename+" does not exist")
@@ -89,6 +92,67 @@ def get_network(db_filename,local_id):
     T = reshape(T,(params.M_ENH,params.N_TF))
     return R, T, G
 
+
+def plot_xtalk_results(database,folder_out):
+    THRESH_FOR_BARPLOT = 10
+
+    if not(os.path.exists(folder_out)):
+        os.mkdir(folder_out)
+
+    res = query_db(database,"SELECT * FROM xtalk")
+    NF = query_db(database,"SELECT N_PF, N_TF, M_GENE FROM parameters")[0]
+
+    txtoffset = 0.01
+    def lab_bars(ax,prop):
+        for ii in range(len(prop)):
+            ax.text(ii,prop[ii]+txtoffset*max(prop),f"{prop[ii]:.3f}",ha="center")
+
+    def get_cdf(x):
+        x_sorted = sort(x)
+        y = range(1,len(x_sorted)+1)
+        return x_sorted, y
+
+    for ii in range(len(res)):
+        network_rowid = res[ii][0]
+        target_pattern = frombuffer(res[ii][1])
+        optimized_input = frombuffer(res[ii][2])
+        output_expression = frombuffer(res[ii][3])
+        xtalk = res[ii][4]
+
+        plt.rcParams.update({'font.size':24})
+        fig, (ax1,ax2) = plt.subplots(2,figsize=(24,48))
+
+        if max(list(NF)) <= THRESH_FOR_BARPLOT:
+            labs = [f"PF {p+1}" for p in range(NF[0])] + [f"TF {t+1}" for t in range(NF[1])]
+            ax1.bar(labs,optimized_input)
+            ax1.set_xlabel("regulatory factor")
+            ax1.set_ylabel("concentration (nM)")
+            lab_bars(ax1,optimized_input)
+
+            ax2.bar([f"gene {g+1}" for g in range(NF[2])],output_expression)
+            ax2.set_ylim([0,1.1])
+            ax2.set_xlabel("gene")
+            ax2.set_ylabel("probability expressing")
+            lab_bars(ax2,output_expression)
+            ax2.set_title(f"target pattern = {target_pattern}")
+            lab_bars(ax1,optimized_input)
+        else:
+            xoi, yoi = get_cdf(optimized_input)
+            ax1.plot(xoi,yoi)
+            ax1.set_xlabel("optimized input concentration (nM)")
+            ax2.set_ylabel("number regulatory factors")
+            
+            N_ON = sum(target_pattern)
+            N_OFF = len(target_pattern) - N_ON
+            xpe, ype = get_cdf(output_expression)
+            ax2.plot(xpe,ype)
+            ax2.set_xlabel("probability expressing")
+            ax2.set_ylabel("number genes")
+            ax2.set_title(f"target pattern = {N_ON} ON, {N_OFF} OFF")
+
+        plt.savefig(os.path.join(folder_out,f"rowid{network_rowid}_{ii}.png"))
+
+
 # Add an achieved pattern to the database.
 def add_pattern(db_filename,local_id,inp,out):
     if not(os.path.exists(db_filename)):
@@ -106,7 +170,7 @@ def add_pattern(db_filename,local_id,inp,out):
     return 0
 
 
-# Returns unique achieved patterns for network with specified id.
+# Return unique achieved patterns for network with specified id.
 def get_achieved_patterns(db_filename,network_rowid):
     if not(os.path.exists(db_filename)):
         print("error getting achieved pattern: "+db_filename+" does not exist")
@@ -165,7 +229,7 @@ def xtalk_result_found(db_filename,network_rowid,target_pattern):
     else:
         return False
 
-
+# Query the database.
 def query_db(db_filename,query):
     if not(os.path.exists(db_filename)):
         print("error querying database: "+db_filename+" does not exist")
@@ -179,7 +243,8 @@ def query_db(db_filename,query):
     con.close()
     return res
 
-
+# Print the provided results formatted for the appropriate
+# (specified) table.
 def print_res(table,res,form="short",db_type="child"):
     assert (form == "short") or (form == "long"), "format must be short or long"
     assert (db_type == "child") or (db_type == "parent"), "db_type must be child or parent"
@@ -234,7 +299,7 @@ def print_res(table,res,form="short",db_type="child"):
 
         for ii in range(len(res)):
             if form == "short":
-                print(f"network_rowid = {res[ii][0]}, target_pattern = {frombuffer(res[ii][1])}, optimized_input = {frombuffer(res[ii][2])}, output_expression = {frombuffer(res[ii][3])}")
+                print(f"network_rowid = {res[ii][0]}, target_pattern = {frombuffer(res[ii][1])}, optimized_input = {frombuffer(res[ii][2])}, output_expression = {frombuffer(res[ii][3])}, fun = {res[ii][4]}")
             else:
                 print(f"network_rowid = {res[ii][0]}, target_pattern = {frombuffer(res[ii][1])}, optimized_input = {frombuffer(res[ii][2])}, output_expression = {frombuffer(res[ii][3])}, fun = {res[ii][4]}, jac = {frombuffer(res[ii][5])}, message = "+res[ii][6]+f", nfev = {res[ii][7]}, nit = {res[ii][8]}, njev = {res[ii][9]}, status = {res[ii][10]}, success = {res[ii][11]}")
                    

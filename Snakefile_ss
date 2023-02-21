@@ -41,4 +41,4 @@ rule get_crosstalk:
 	output:
 		RESDIR+"{id}.xtalk"
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/calc_crosstalk.py -t -x -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH

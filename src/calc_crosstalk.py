@@ -7,7 +7,7 @@ from multiprocess import Pool
 import dill
 # import time
 import matplotlib.pyplot as plt
-import sys, getopt
+import sys, argparse
 from os.path import exists
 # from memory_profiler import profile, memory_usage
 
@@ -18,9 +18,6 @@ from boolarr import *
 import manage_db
 
 
-def print_usage():
-    print("usage is: calc_crosstalk -i <filename_in> -n <npatterns> -d <database>")
-
 # @profile
 def main(argv):
     # mem_usage = memory_usage(-1, interval=.2, timeout=1, max_usage=True, include_children=True)
@@ -28,28 +25,22 @@ def main(argv):
     npatterns = inf
     database = "temp.db"
 
-    try:
-        opts, args = getopt.getopt(argv,"hi:n:d:")
-    except getopt.GetoptError:
-        print_usage()
-        sys.exit(2)
+    parser = argparse.ArgumentParser(
+            prog = "calc_crosstalk",
+            description = "",
+            epilog = "")
+    parser.add_argument("-i","--filename_in",required=True)
+    parser.add_argument("-n","--npatterns",type=int,default=inf)
+    parser.add_argument("-d","--database",required=True)
+    parser.add_argument("-x","--crosslayer_crosstalk",action="store_true",default=False)
+    parser.add_argument("-t","--tf_first_layer",action="store_true",default=False)
 
-    if len(argv) < 1:
-        print("calc_crosstalk.py: input -i is required")
-        print_usage()
-        sys.exit(2)
-
-    for opt, arg in opts:
-        if opt == "-h":
-            print_usage()
-            sys.exit()
-        elif opt == "-i":
-            filename_in = arg
-        elif opt == "-n":
-            npatterns = int(arg)
-        elif opt == "-d":
-            database = arg
-
+    args = parser.parse_args()
+    filename_in = args.filename_in
+    npatterns = args.npatterns
+    database = args.database
+    crosslayer_crosstalk = args.crosslayer_crosstalk
+    tf_first_layer = args.tf_first_layer
 
     local_id = manage_db.extract_local_id(filename_in)
 
@@ -60,7 +51,10 @@ def main(argv):
     achievable_patterns = manage_db.get_achieved_patterns(database,local_id)
 
     # pr_gene_on is imported with tf_binding_equilibrium
-    pr_chromatin_open = dill.load(open("./src/chromatin_kpr_pr_open.out", "rb"))
+    if tf_first_layer:
+        pr_chromatin_open = dill.load(open("./src/tf_chrom_equiv_pr_bound.out","rb"))
+    else:
+        pr_chromatin_open = dill.load(open("./src/chromatin_kpr_pr_open.out", "rb"))
 
 
     R_bool = (R != 0)
@@ -79,7 +73,10 @@ def main(argv):
             C_PF = sum(c_PF)
             C_TF = sum(c_TF)
             
-            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_gene_on(C_TF,c_TF[t])
+            if crosslayer_crosstalk:
+                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])*pr_gene_on(C_TF+C_PF,c_TF[t])
+            else:
+                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_gene_on(C_TF,c_TF[t])
         
             return concatenate(list(map(pr_wrapper,R_bool,T_bool)))
 
@@ -95,7 +92,7 @@ def main(argv):
         print("npatterns must be strictly positive")
         sys.exit(2)
         
-    eps = 1e-3   # tolerance for optimization
+    eps = 1e-6   # tolerance for optimization
 
     # tstart = time.perf_counter()
     for ii, target_pattern in enumerate(achievable_patterns):

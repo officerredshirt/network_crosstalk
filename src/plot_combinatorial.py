@@ -9,13 +9,15 @@ import os
 
 def main(argv):
     parser = argparse.ArgumentParser(
-            prog = "test_new_db",
+            prog = "plot_combinatorial",
             description = "",
             epilog = "")
     parser.add_argument("database")
+    parser.add_argument("folder_out")
 
     args = parser.parse_args()
     database = args.database
+    folder_out = args.folder_out
 
     ext = os.path.splitext(database)[1]
     if ext == "":
@@ -26,31 +28,8 @@ def main(argv):
         sys.exit(1)
 
     assert os.path.exists(database), "database " + database + " does not exist"
-    con = sqlite3.connect(database)
-    cur = con.cursor()
 
-    # TODO: fix manage_db to print these nicely
-    print("PARAMETERS")
-    res = manage_db.query_db(database,"SELECT * FROM parameters")
-    manage_db.print_res("parameters",res)
-    print("")
-
-    print("NETWORKS")
-    res = manage_db.query_db(database,"SELECT * FROM networks")
-    manage_db.print_res("networks",res)
-    print("")
-
-    print("PATTERNS")
-    res = manage_db.query_db(database,"SELECT * FROM patterns")
-    manage_db.print_res("patterns",res)
-    print("")
-    
-    print("XTALK")
-    res = manage_db.query_db(database,"SELECT * FROM xtalk")
-    manage_db.print_res("xtalk",res)
-    print("")
-    
-    con.close()
+    manage_db.plot_xtalk_results(database,folder_out)
 
 
 if __name__ == "__main__":

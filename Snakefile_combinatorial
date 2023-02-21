@@ -23,7 +23,7 @@ rule gen_networks:
 	output:
 		expand(RESDIR+"{id}.arch",id=IDS)
 	shell:
-		DIR+f"src/ss_gen_network.py -o "+RESDIR+"{IDS} -d "+DATABASE_PATH 
+		DIR+f"src/gen_combinatorial_network.py -o "+RESDIR+"{IDS} -d "+DATABASE_PATH 
 
 
 rule get_achievables:
@@ -32,7 +32,7 @@ rule get_achievables:
 	output:
 		expand(RESDIR+"{id}.achieved",allow_missing=True)
 	shell:
-		DIR+"src/ss_get_achievable_patterns.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/get_achievable_patterns.py -u -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
 
 
 rule get_crosstalk:
@@ -41,4 +41,4 @@ rule get_crosstalk:
 	output:
 		RESDIR+"{id}.xtalk"
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/calc_crosstalk.py -t -x -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH

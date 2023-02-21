@@ -6,7 +6,6 @@ import manage_db
 
 from params import *
 
-
 # TODO:
 # [ ] assign connections according to particular distributions
 # [ ] allow more than one gene per enhancer
@@ -14,7 +13,7 @@ from params import *
 def main(argv):
 
     parser = argparse.ArgumentParser(
-            prog = "gen_network",
+            prog = "ss_gen_network",
             description = "",
             epilog = "")
     parser.add_argument("-o","--filename_out",required=True,default="out.arch")
@@ -24,29 +23,31 @@ def main(argv):
     filename_out = args.filename_out
     database = args.database
 
-    is_pathological = True
-    while is_pathological:
+    # generate database
+    manage_db.init_tables(database)
 
-        # generate connections from PFs to enhancers
-        if N_PF != 0:
-            R = zeros([M_ENH,N_PF])
-            for ii in range(M_ENH):
-                R[ii,random.randint(0,N_PF)] = 1
-        else:
-            R = array([])
-        
-        # generate connections from TFs to enhancers
-        T = zeros([M_ENH,N_TF])
-        temp = concatenate((ones(THETA),zeros(N_TF - THETA)))
-        for ii in range(M_ENH):
-            T[ii,] = random.permutation(temp)
-        
-        # generate connections from enhancers to genes
-        # trivial for now (one gene per enhancer)
-        G = identity(M_GENE)
+    # populate parameters
+    manage_db.add_parameters(database)
 
-        is_pathological = any(sum(T,axis=0) < 1) or ((len(R) > 0) and any(sum(R,axis=0) < 1))
-            
+    # R is M_GENE x N_PF
+    if sc == 1:
+        R = identity(M_GENE)
+    elif sc == 2:
+        R_ul = ones((N_ON,1))
+        R_ur = zeros((N_ON,N_PF-1))
+        R_ll = zeros((N_PF-1,1))
+        R_lr = identity(N_PF-1)
+        R = block([[R_ul,R_ur],[R_ll,R_lr]])
+    elif sc == 3:
+        R_ul = ones((N_ON+N_OFF_shared,1))
+        R_ur = zeros((N_ON+N_OFF_shared,N_PF-1))
+        R_ll = zeros((N_PF-1,1))
+        R_lr = identity(N_PF-1)
+        R = block([[R_ul,R_ur],[R_ll,R_lr]])
+
+    T = identity(M_GENE)
+    G = identity(M_GENE)
+    
 
     # -- UPLOAD ARCHITECTURE TO DATABASE -- #
     local_id = manage_db.extract_local_id(filename_out)
