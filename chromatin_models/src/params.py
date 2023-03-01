@@ -2,7 +2,7 @@
 # coding: utf-8
 
 rp = 0
-rm = 0.0002     # s-1
+rm = 0.00020    # s-1
 kh_Sp = 0.0005  # s-1 nM-1
 kh_Sm = 0.005   # s-1
 kh_NSp = 0.0005 # s-1 nM-1

@@ -58,7 +58,7 @@ def main(argv):
     parser.add_argument("first_layer_file")
     parser.add_argument("second_layer_file")
     parser.add_argument("prefix")
-    parser.add_argument("-s","--scenarios",type=int,nargs='+',default=range(1,8))
+    parser.add_argument("-s","--scenarios",type=int,nargs='+',default=range(1,7)) # ignore scenario 7 for now
     parser.add_argument("-o","--optimize",dest="optimize_xtalk",action="store_true",default=False)
     parser.add_argument("-x","--crosslayer_crosstalk",action="store_true",default=False)
     parser.add_argument("-m","--max_expression_lock",action="store_true",default=False)
@@ -245,7 +245,7 @@ def main(argv):
                                                 (pr_layer1(C,0),pr_layer2(C,Cl2)),
                                                 (pr_layer1(C,0),pr_layer2(C,0))], \
                                                         [err_layer2(C,Cl2), err_layer2(C,0),
-                                                         err_layer2(C,cl2), err_layer2(C,0)], labs
+                                                         err_layer2(C,Cl2), err_layer2(C,0)], labs
                 else:
                     return entries_on, coeffs, [(pr_layer1(Cl1,Cl1),pr_layer2(Cl2,Cl2)),
                                                 (pr_layer1(Cl1,Cl1),pr_layer2(Cl2,0)),
@@ -316,6 +316,11 @@ def main(argv):
     # len(labs) gene categories along the contour
     def get_pr_at_contour(num,contour_ix,contour_level,x_axis,optimal_C):
         plt.rcParams.update({'font.size': 24})
+        markersz = 500
+
+        entries_on, coeffs, pr_opt, err, labs = xtalk_on_off_exp(num)(optimal_C[0],optimal_C[1])
+        pr_expressing_opt = prob_expressing(pr_opt)
+        xtalk_opt = xtalk_objective_fn_scenario(num,optimal_C[0],optimal_C[1])
 
         entries_on, coeffs, pr, err, labs = xtalk_on_off_exp(num)(Cl1_set,Cl2_set)
         pr_exp = prob_expressing(pr)
@@ -340,15 +345,32 @@ def main(argv):
             print(f"unrecognized x axis variable name {x_axis}")
             sys.exit()
 
+        xtalk = xtalk_objective_fn_scenario(num,contour_verts[:,0],contour_verts[:,1])
+        fig, ax = plt.subplots(figsize = (24,24))
+        plt.plot(contour_verts[:,x_ax_ix],xtalk)
+        plt.plot([optimal_C[x_ax_ix],optimal_C[x_ax_ix]],[0,1e10],label=f"optimal {x_axis}",color="gray",linewidth=2)
+        plt.scatter(optimal_C[x_ax_ix],xtalk_opt,marker="o",s=markersz,edgecolors="gray",facecolors="none",label="optimum")
+        ax.set_xlabel(x_axis)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_ylim(min(1e-20,min(xtalk)),max(xtalk))
+        ax.set_ylabel("crosstalk")
+        ax.set_title(f"crosstalk along contour pr({labs[contour_ix]}) = {contour_level:.3f}")
+        plt.savefig(os.path.join(folder,f"{prefix}_scenario{num}_crosstalk_contourslice_{contour_ix}_{contour_level:.3f}.png"))
+
         for p in range(len(labs)):
             pr_layer1_at_contour = pr[p][0]
             pr_layer2_at_contour = pr[p][1]
 
             fig, ax = plt.subplots(figsize = (24,24))
-            plt.scatter(contour_verts[:,x_ax_ix],pr_layer1_at_contour,label="probability layer 1 on")
-            plt.scatter(contour_verts[:,x_ax_ix],pr_layer2_at_contour,label="probability layer 2 on")
-            plt.scatter(contour_verts[:,x_ax_ix],pr_expressing[p],label="probability expressing (p1*p2)")
+            p1 = plt.scatter(contour_verts[:,x_ax_ix],pr_layer1_at_contour,label="probability layer 1 on")
+            p2 = plt.scatter(contour_verts[:,x_ax_ix],pr_layer2_at_contour,label="probability layer 2 on")
+            p3 = plt.scatter(contour_verts[:,x_ax_ix],pr_expressing[p],label="probability expressing (p1*p2)")
             plt.plot([optimal_C[x_ax_ix],optimal_C[x_ax_ix]],[0,1],label=f"optimal {x_axis}",color="gray",linewidth=2)
+
+            plt.scatter(optimal_C[x_ax_ix],pr_opt[p][0],marker="o",s=markersz,edgecolors=p1.get_edgecolor(),facecolors="none")
+            plt.scatter(optimal_C[x_ax_ix],pr_opt[p][1],marker="o",s=markersz,edgecolors=p2.get_edgecolor(),facecolors="none")
+            plt.scatter(optimal_C[x_ax_ix],pr_expressing_opt[p],marker="o",s=markersz,edgecolors=p3.get_edgecolor(),facecolors="none")
             ax.set_xlabel(x_axis)
             ax.set_xscale("log")
 
@@ -358,18 +380,6 @@ def main(argv):
             ax.set_title(f"probability of layers on for {labs[p]} along contour pr({labs[contour_ix]}) = {contour_level:.3f}")
             ax.legend()
             plt.savefig(os.path.join(folder,f"{prefix}_scenario{num}_genes{p}_contourslice_{contour_ix}_{contour_level:.3f}.png"))
-
-            xtalk = xtalk_objective_fn_scenario(num,contour_verts[:,0],contour_verts[:,1])
-            fig, ax = plt.subplots(figsize = (24,24))
-            plt.plot(contour_verts[:,x_ax_ix],xtalk)
-            plt.plot([optimal_C[x_ax_ix],optimal_C[x_ax_ix]],[0,1e10],label=f"optimal {x_axis}",color="gray",linewidth=2)
-            ax.set_xlabel(x_axis)
-            ax.set_xscale("log")
-            ax.set_yscale("log")
-            ax.set_ylim(min(1e-20,min(xtalk)),max(xtalk))
-            ax.set_ylabel("crosstalk")
-            ax.set_title(f"crosstalk along contour pr({labs[contour_ix]}) = {contour_level:.3f}")
-            plt.savefig(os.path.join(folder,f"{prefix}_scenario{num}_genes{p}_crosstalk_contourslice_{contour_ix}_{contour_level:.3f}.png"))
 
 
     for ii, sc in enumerate(scenarios):
