@@ -19,26 +19,32 @@ rule all:
 	shell:
 		"mkdir "+CLUSTER_DIR+"; cp -r Snakefile "+DIR+"src sm.sh " +CLUSTER_DIR+"||:; mv -b "+RESDIR+" "+CLUSTER_DIR
 
+rule gen_models:
+    output:
+        RESDIR+"tf_chrom_equiv_pr_bound.out", RESDIR+"tf_pr_bound.out", RESDIR+"kpr_pr_open.out"
+    shell:
+        DIR+f"src/gen_kinetic_models.py "+RESDIR
+
 rule gen_networks:
 	output:
 		expand(RESDIR+"{id}.arch",id=IDS)
 	shell:
-		DIR+f"src/ss_gen_network.py -o "+RESDIR+"{IDS} -d "+DATABASE_PATH 
+		DIR+f"src/gen_custom_network.py -o "+RESDIR+"{IDS} -d "+DATABASE_PATH 
 
 
-rule get_achievables:
+rule get_target_patterns:
 	input:
 		RESDIR+"{id}.arch"
 	output:
-		expand(RESDIR+"{id}.achieved",allow_missing=True)
+		expand(RESDIR+"{id}.target",allow_missing=True)
 	shell:
-		DIR+"src/ss_get_achievable_patterns.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/set_custom_target_patterns.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
 
 
 rule get_crosstalk:
 	input:
-		RESDIR+"{id}.achieved"
+		RESDIR+"{id}.target", RESDIR+"tf_chrom_equiv_pr_bound.out", RESDIR+"tf_pr_bound.out", RESDIR+"kpr_pr_open.out"
 	output:
 		RESDIR+"{id}.xtalk"
 	shell:
-		DIR+"src/calc_crosstalk.py -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		DIR+"src/calc_crosstalk.py -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH+" -n 1"

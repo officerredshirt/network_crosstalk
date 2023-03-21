@@ -7,12 +7,11 @@ from multiprocess import Pool
 import dill
 # import time
 import matplotlib.pyplot as plt
-import sys, argparse
-from os.path import exists
+import os, sys, argparse
 # from memory_profiler import profile, memory_usage
 
 from params import *
-from tf_binding_equilibrium import *
+# from tf_binding_equilibrium import *
 from boolarr import *
 
 import manage_db
@@ -30,6 +29,7 @@ def main(argv):
             description = "",
             epilog = "")
     parser.add_argument("-i","--filename_in",required=True)
+    parser.add_argument("-m","--model_folder",required=True)
     parser.add_argument("-n","--npatterns",type=int,default=inf)
     parser.add_argument("-d","--database",required=True)
     parser.add_argument("-x","--crosslayer_crosstalk",action="store_true",default=False)
@@ -41,6 +41,7 @@ def main(argv):
     database = args.database
     crosslayer_crosstalk = args.crosslayer_crosstalk
     tf_first_layer = args.tf_first_layer
+    model_folder = args.model_folder
 
     local_id = manage_db.extract_local_id(filename_in)
 
@@ -52,9 +53,11 @@ def main(argv):
 
     # pr_gene_on is imported with tf_binding_equilibrium
     if tf_first_layer:
-        pr_chromatin_open = dill.load(open("./src/tf_chrom_equiv_pr_bound.out","rb"))
+        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_pr_bound.out"),"rb"))
     else:
-        pr_chromatin_open = dill.load(open("./src/chromatin_kpr_pr_open.out", "rb"))
+        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"kpr_pr_open.out"), "rb"))
+
+    pr_gene_on = dill.load(open(os.path.join(model_folder,"tf_pr_bound.out"),"rb"))
 
 
     R_bool = (R != 0)
