@@ -29,20 +29,25 @@ def main(argv):
     con = sqlite3.connect(database)
     cur = con.cursor()
 
+    # TODO: fix manage_db to print these nicely
     print("PARAMETERS")
-    manage_db.print_res(database,"parameters")
+    res = manage_db.query_db(database,"SELECT * FROM parameters")
+    manage_db.print_res("parameters",res)
     print("")
 
     print("NETWORKS")
-    manage_db.print_res(database,"networks")
+    res = manage_db.query_db(database,"SELECT * FROM networks")
+    manage_db.print_res("networks",res)
     print("")
 
     print("PATTERNS")
-    manage_db.print_res(database,"patterns")
+    res = manage_db.query_db(database,"SELECT * FROM patterns")
+    manage_db.print_res("patterns",res)
     print("")
     
     print("XTALK")
-    manage_db.print_res(database,"xtalk")
+    res = manage_db.query_db(database,"SELECT * FROM xtalk")
+    manage_db.print_res("xtalk",res)
     print("")
     
     con.close()

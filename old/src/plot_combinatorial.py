@@ -9,13 +9,15 @@ import os
 
 def main(argv):
     parser = argparse.ArgumentParser(
-            prog = "test_new_db",
+            prog = "plot_combinatorial",
             description = "",
             epilog = "")
     parser.add_argument("database")
+    parser.add_argument("folder_out")
 
     args = parser.parse_args()
     database = args.database
+    folder_out = args.folder_out
 
     ext = os.path.splitext(database)[1]
     if ext == "":
@@ -26,26 +28,8 @@ def main(argv):
         sys.exit(1)
 
     assert os.path.exists(database), "database " + database + " does not exist"
-    con = sqlite3.connect(database)
-    cur = con.cursor()
 
-    print("PARAMETERS")
-    manage_db.print_res(database,"parameters")
-    print("")
-
-    print("NETWORKS")
-    manage_db.print_res(database,"networks")
-    print("")
-
-    print("PATTERNS")
-    manage_db.print_res(database,"patterns")
-    print("")
-    
-    print("XTALK")
-    manage_db.print_res(database,"xtalk")
-    print("")
-    
-    con.close()
+    manage_db.plot_xtalk_results(database,folder_out)
 
 
 if __name__ == "__main__":

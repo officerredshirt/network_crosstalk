@@ -1,30 +1,36 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
-# "pattern" specification
-M_GENE = 100        # total number genes
-M_ENH = M_GENE
-N_ON = 10           # number ON genes
-N_OFF = M_GENE - N_ON    # number OFF genes
-N_OFF_shared = 18   # (scenario 3) number of OFF genes sharing PF with N_ON
-sc = 3              # choice of scenario
-
 # ARCHITECTURE
-N_TF = M_GENE       # number transcription factors
+N_PF = 5                # number pioneer factors
+N_CLUSTERS = N_PF       # number clusters
+GENES_PER_CLUSTER = 5   # number genes per cluster
+M_GENE = GENES_PER_CLUSTER*N_CLUSTERS   # number genes
+N_TF = M_GENE           # number transcription factors
+M_ENH = M_GENE          # number enhancers
 
-if sc == 1:
-    N_PF = M_GENE       # number pioneer factors
-elif sc == 2:
-    N_PF = M_GENE - N_ON + 1
-elif sc == 3:
-    N_PF = M_GENE - N_ON - N_OFF_shared + 1
-THETA = 1           # number TFs per enhancer
-n = 1               # number binding sites per TF
+# LAYER 1 (CHROMATIN)
+rp = 0
+rm = 0.00020    # s-1
+kh_Sp = 0.0005  # s-1 nM-1
+kh_Sm = 0.005   # s-1
+kh_NSp = 0.0005 # s-1 nM-1
+kh_NSm = 50     # s-1  **this appears to be the most important for proper proofreading
+k_neq = 0.05    # s-1
 
-# EQUILIBRIUM TF BINDING
-K_S = 10            # TF specific binding constant
-K_NS = 100000       # TF nonspecific binding constant
-n0 = 1              # minimum # bound TFs to induce expression
+# LAYER 2 EQUILIBRIUM TF
+THETA = 1     # number TFs per enhancer (layer 2)
+n = 1         # number binding sites per TF (layer 2)
+K_S = kh_Sm/kh_Sp  # TF binding dissociation rate (specific)
+#K_NS = 100000      # TF binding dissociation rate (nonspecific)
+K_NS = kh_NSm/kh_NSp    # s-1
 
-NUM_RANDINPUTS = 1
+# TARGET PATTERN
+NUM_TARGETS = 10        # number random target patterns to generate
+MIN_CLUSTERS_ACTIVE = 1 # minimum number of clusters containing expressing genes
+MAX_CLUSTERS_ACTIVE = 5 # maximum number of clusters containing expressing genes
+MIN_EXPRESSION = 0.3    # minimum expression level for a gene in a target pattern
+MAX_EXPRESSION = 0.9    # maximum expression level for a gene in a target pattern
+
+# OPTIMIZATION
+eps = 1e-10

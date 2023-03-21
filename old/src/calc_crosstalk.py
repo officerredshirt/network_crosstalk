@@ -47,8 +47,8 @@ def main(argv):
     # load architecture
     R, T, G = manage_db.get_network(database,local_id)
 
-    # load target patterns
-    target_patterns = manage_db.get_target_patterns(database,local_id)
+    # load achievable patterns
+    achievable_patterns = manage_db.get_achieved_patterns(database,local_id)
 
     # pr_gene_on is imported with tf_binding_equilibrium
     if tf_first_layer:
@@ -86,15 +86,16 @@ def main(argv):
         return transpose(d)@d
 
 
-    if npatterns > len(target_patterns):
-        npatterns = len(target_patterns)
+    if npatterns > len(achievable_patterns):
+        npatterns = len(achievable_patterns)
     elif npatterns < 1:
         print("npatterns must be strictly positive")
         sys.exit(2)
         
+    eps = 1e-6   # tolerance for optimization
 
     # tstart = time.perf_counter()
-    for ii, target_pattern in enumerate(target_patterns):
+    for ii, target_pattern in enumerate(achievable_patterns):
         if ii >= npatterns:
             break
 
@@ -106,7 +107,7 @@ def main(argv):
 
         if not(manage_db.xtalk_result_found(database,local_id,target_pattern)):
             # starting point
-            c_0 = [10]*(N_PF + N_TF)
+            c_0 = ones(N_PF + N_TF)
             optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
             output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
             manage_db.add_xtalk(database,local_id,target_pattern,optres,output_expression)

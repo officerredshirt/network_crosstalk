@@ -1,17 +1,11 @@
 import sqlite3
 import params
-import os, sys
-import numpy as np
+import os
+from numpy import *
 import matplotlib.pyplot as plt
 
 def extract_local_id(filename):
     return int(os.path.splitext(os.path.basename(filename))[0])
-
-def get_param_names():
-    return [i for i in dir(params) if not(i.startswith("__"))]
-
-def get_col_names(cur):
-    return list(map(lambda x: x[0], cur.description))
 
 # Initialize the parameter, network, pattern, and crosstalk tables in the database.
 def init_tables(db_filename,db_type="child"):
@@ -20,11 +14,7 @@ def init_tables(db_filename,db_type="child"):
     cur = con.cursor()
 
     ### GENERATE TABLES OF PARAMETERS, NETWORKS, PATTERNS, XTALK ###
-
-    # get parameter names
-    param_list = ",".join(get_param_names())
-
-    cur.execute(f"CREATE TABLE parameters({param_list})")
+    cur.execute("CREATE TABLE parameters(N_PF,N_TF,M_ENH,M_GENE,THETA,n,K_S,K_NS,n0,NUM_RANDINPUTS)")
     cur.execute("CREATE TABLE networks(parameter_rowid,local_id,R,G,T)")
     if db_type == "parent":
         cur.execute("ALTER TABLE parameters ADD COLUMN folder")
@@ -34,7 +24,7 @@ def init_tables(db_filename,db_type="child"):
         print("unrecognized database type "+db_type)
         return 1
 
-    cur.execute("CREATE TABLE patterns(network_rowid,input,target)")
+    cur.execute("CREATE TABLE patterns(network_rowid,input,achieved)")
     cur.execute("CREATE TABLE xtalk(network_rowid,target_pattern,optimized_input,output_expression,fun,jac,message,nfev,nit,njev,status,success)")
 
     con.commit()
@@ -49,14 +39,8 @@ def add_parameters(db_filename):
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    ncols = cur.execute("SELECT COUNT(*) FROM pragma_table_info('parameters')").fetchone()[0]
-    param_names = get_param_names()
-
-    col_insert_query = ",".join(param_names)
-    param_values = [getattr(params,param) for param in param_names]
-    param_insert_query = ",".join([f"{x}" for x in param_values])
-
-    cur.execute(f"INSERT INTO parameters ({col_insert_query}) VALUES({param_insert_query})")
+    cur.execute("INSERT INTO parameters VALUES(?,?,?,?,?,?,?,?,?,?)",
+                [params.N_PF,params.N_TF,params.M_ENH,params.M_GENE,params.THETA,params.n,params.K_S,params.K_NS,params.n0,params.NUM_RANDINPUTS])
 
     con.commit()
     con.close()
@@ -98,14 +82,14 @@ def get_network(db_filename,local_id):
 
     con.close()
 
-    R = np.frombuffer(arch[0][0])
-    R = np.reshape(R,(params.M_ENH,params.N_PF))
+    R = frombuffer(arch[0][0])
+    R = reshape(R,(params.M_ENH,params.N_PF))
 
-    G = np.frombuffer(arch[0][1])
-    G = np.reshape(G,(params.M_GENE,params.M_ENH))
+    G = frombuffer(arch[0][1])
+    G = reshape(G,(params.M_GENE,params.M_ENH))
 
-    T = np.frombuffer(arch[0][2])
-    T = np.reshape(T,(params.M_ENH,params.N_TF))
+    T = frombuffer(arch[0][2])
+    T = reshape(T,(params.M_ENH,params.N_TF))
     return R, T, G
 
 
@@ -130,9 +114,9 @@ def plot_xtalk_results(database,folder_out):
 
     for ii in range(len(res)):
         network_rowid = res[ii][0]
-        target_pattern = np.frombuffer(res[ii][1])
-        optimized_input = np.frombuffer(res[ii][2])
-        output_expression = np.frombuffer(res[ii][3])
+        target_pattern = frombuffer(res[ii][1])
+        optimized_input = frombuffer(res[ii][2])
+        output_expression = frombuffer(res[ii][3])
         xtalk = res[ii][4]
 
         plt.rcParams.update({'font.size':24})
@@ -169,7 +153,7 @@ def plot_xtalk_results(database,folder_out):
         plt.savefig(os.path.join(folder_out,f"rowid{network_rowid}_{ii}.png"))
 
 
-# Add a target pattern to the database.
+# Add an achieved pattern to the database.
 def add_pattern(db_filename,local_id,inp,out):
     if not(os.path.exists(db_filename)):
         print("error adding pattern: "+db_filename+" does not exist")
@@ -186,22 +170,22 @@ def add_pattern(db_filename,local_id,inp,out):
     return 0
 
 
-# Return unique target patterns for network with specified id.
-def get_target_patterns(db_filename,network_rowid):
+# Return unique achieved patterns for network with specified id.
+def get_achieved_patterns(db_filename,network_rowid):
     if not(os.path.exists(db_filename)):
-        print("error getting target pattern: "+db_filename+" does not exist")
+        print("error getting achieved pattern: "+db_filename+" does not exist")
         return 1
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    res = cur.execute(f"SELECT target FROM patterns WHERE network_rowid = {network_rowid}").fetchall()
+    res = cur.execute(f"SELECT achieved FROM patterns WHERE network_rowid = {network_rowid}").fetchall()
 
     con.commit()
     con.close()
 
-    target_patterns = [np.frombuffer(x[0]) for x in res]
-    return list(map(np.array,set(map(tuple,target_patterns))))
+    achieved_patterns = [frombuffer(x[0]) for x in res]
+    return list(map(array,set(map(tuple,achieved_patterns))))
 
 
 # note: local_id is used in place of network_rowid so that it can be set directly by Snakefile
@@ -238,7 +222,7 @@ def xtalk_result_found(db_filename,network_rowid,target_pattern):
     con.commit()
     con.close()
 
-    patterns_already_evaluated = [np.frombuffer(x[1]) for x in res_table]
+    patterns_already_evaluated = [frombuffer(x[1]) for x in res_table]
 
     if len(patterns_already_evaluated) > 0:
         return any([array_equal(target_pattern,x) for x in patterns_already_evaluated])
@@ -261,25 +245,27 @@ def query_db(db_filename,query):
 
 # Print the provided results formatted for the appropriate
 # (specified) table.
-def print_res(db_filename,table,form="short",spec="*"):
+def print_res(table,res,form="short",db_type="child"):
     assert (form == "short") or (form == "long"), "format must be short or long"
+    assert (db_type == "child") or (db_type == "parent"), "db_type must be child or parent"
 
-    if not(os.path.exists(db_filename)):
-        print("error querying database: "+db_filename+" does not exist")
-        return 1
+    if table == "parameters":
+        if db_type == "child":
+            if not(len(res[0])) == 10:
+                print("for parameters (db type child), res must have 10 entries")
+                return 1
+        else:
+            if not(len(res[0])) == 11:
+                print("for parameters (db type parent), res must have 11 entries")
+                return 1
 
-    con = sqlite3.connect(db_filename)
-    cur = con.cursor()
-    res = cur.execute(f"SELECT {spec} FROM {table}").fetchall()
-    col_names = get_col_names(cur)
+        for ii in range(len(res)):
+            if form == "short":
+                print(f"N_PF = {res[ii][0]}, N_TF = {res[ii][1]}, M_ENH = {res[ii][2]}, M_GENE = {res[ii][3]}, THETA = {res[ii][4]}, n = {res[ii][5]}")
+            else:
+                print(f"N_PF = {res[ii][0]}, N_TF = {res[ii][1]}, M_ENH = {res[ii][2]}, M_GENE = {res[ii][3]}, THETA = {res[ii][4]}, n = {res[ii][5]}, K_S = {res[ii][6]}, K_NS = {res[ii][7]}, n0 = {res[ii][8]}, NUM_RANDINPUTS = {res[ii][9]}")
 
-    if form == "short":
-        nentry_to_display = 5
-    else:
-        nentry_to_display = len(res[0])
-
-
-    if table == "networks":
+    elif table == "networks":
         if not(len(res[0])) == 5:
             print("for networks, res must have 5 entries")
             return 1
@@ -288,21 +274,14 @@ def print_res(db_filename,table,form="short",spec="*"):
             parameter_rowid = res[ii][0]
             local_id = res[ii][1]
 
-            cur_params = cur.execute(f"SELECT M_ENH, N_PF, M_GENE, N_TF from parameters WHERE rowid = {parameter_rowid}").fetchone()
+            R = frombuffer(res[ii][2])
+            R = reshape(R,(params.M_ENH,params.N_PF))
 
-            M_ENH = cur_params[0]
-            N_PF = cur_params[1]
-            M_GENE = cur_params[2]
-            N_TF = cur_params[3]
+            G = frombuffer(res[ii][3])
+            G = reshape(G,(params.M_GENE,params.M_ENH))
 
-            R = np.frombuffer(res[ii][2])
-            R = np.reshape(R,(M_ENH,N_PF))
-
-            G = np.frombuffer(res[ii][3])
-            G = np.reshape(G,(M_GENE,M_ENH))
-
-            T = np.frombuffer(res[ii][4])
-            T = np.reshape(T,(M_ENH,N_TF))
+            T = frombuffer(res[ii][4])
+            T = reshape(T,(params.M_ENH,params.N_TF))
 
             print(f"parameter_rowid = {parameter_rowid}, local_id = {local_id}, R = {R}, G = {G}, T = {T}")
     elif table == "patterns":
@@ -311,7 +290,7 @@ def print_res(db_filename,table,form="short",spec="*"):
                return 1
 
         for ii in range(len(res)):
-            print(f"network_rowid = {res[ii][0]}, input = {np.frombuffer(res[ii][1],dtype=bool)}, target = {np.frombuffer(res[ii][2])}")
+            print(f"network_rowid = {res[ii][0]}, input = {frombuffer(res[ii][1],dtype=bool)}, achieved = {frombuffer(res[ii][2])}")
         return 0
     elif table == "xtalk":
         if not(len(res[0])) == 12:
@@ -320,17 +299,13 @@ def print_res(db_filename,table,form="short",spec="*"):
 
         for ii in range(len(res)):
             if form == "short":
-                print(f"network_rowid = {res[ii][0]}, target_pattern = {np.frombuffer(res[ii][1])}, optimized_input = {np.frombuffer(res[ii][2])}, output_expression = {np.frombuffer(res[ii][3])}, fun = {res[ii][4]}")
+                print(f"network_rowid = {res[ii][0]}, target_pattern = {frombuffer(res[ii][1])}, optimized_input = {frombuffer(res[ii][2])}, output_expression = {frombuffer(res[ii][3])}, fun = {res[ii][4]}")
             else:
-                print(f"network_rowid = {res[ii][0]}, target_pattern = {np.frombuffer(res[ii][1])}, optimized_input = {np.frombuffer(res[ii][2])}, output_expression = {np.frombuffer(res[ii][3])}, fun = {res[ii][4]}, jac = {np.frombuffer(res[ii][5])}, message = "+res[ii][6]+f", nfev = {res[ii][7]}, nit = {res[ii][8]}, njev = {res[ii][9]}, status = {res[ii][10]}, success = {res[ii][11]}")
+                print(f"network_rowid = {res[ii][0]}, target_pattern = {frombuffer(res[ii][1])}, optimized_input = {frombuffer(res[ii][2])}, output_expression = {frombuffer(res[ii][3])}, fun = {res[ii][4]}, jac = {frombuffer(res[ii][5])}, message = "+res[ii][6]+f", nfev = {res[ii][7]}, nit = {res[ii][8]}, njev = {res[ii][9]}, status = {res[ii][10]}, success = {res[ii][11]}")
                    
-    else:
-        for ii in range(len(res)):
-            print(", ".join(list(map(lambda x,y: f"{x} = {y}",col_names[0:nentry_to_display],res[ii][0:nentry_to_display]))))
+        return 0
 
-    con.close()
-
-    return 0
+    return 1
 
 
 # append db to the full database db_parent
@@ -344,8 +319,6 @@ def append_db(db_parent_filename,db_filename):
 
     db_parent = sqlite3.connect(db_parent_filename, timeout=20.0)
     parent_cur = db_parent.cursor()
-    parent_cur.execute("SELECT * FROM parameters")
-    parent_param_col_names = get_col_names(parent_cur)
 
     assert os.path.exists(db_filename), db_filename+" not found"
     
@@ -356,24 +329,13 @@ def append_db(db_parent_filename,db_filename):
     assert len(child_folder) == 1, "check child database filepath"
 
     parameters = child_cur.execute("SELECT * FROM parameters").fetchall()
-    child_param_col_names = get_col_names(child_cur)
-
-    print(parent_param_col_names)
-    print(child_param_col_names)
-
     assert len(parameters) == 1, "child database must have exactly one entry in parameters table"
-
-    if not(set(child_param_col_names).issubset(parent_param_col_names)):
-        print("error: parent database has different parameter set than child database")
-        return 1
-
+    assert len(parameters[0]) == 10, "child database should have 10 columns in parameters table"
     parameters = parameters[0]
 
     param_table = parent_cur.execute("SELECT rowid FROM parameters WHERE folder = '"+child_folder[0]+"'").fetchall()
     if len(param_table) == 0:
-        col_query_str = ", ".join([f"{x}" for x in child_param_col_names])
-        param_query_str = ", ".join([f"{x}" for x in parameters])
-        parent_cur.execute(f"INSERT INTO parameters ({col_query_str}, folder) VALUES({param_query_str},'{child_folder[0]}')")
+        parent_cur.execute(f"INSERT INTO parameters VALUES({parameters[0]}, {parameters[1]}, {parameters[2]}, {parameters[3]}, {parameters[4]}, {parameters[5]}, {parameters[6]}, {parameters[7]}, {parameters[8]}, {parameters[9]}, '"+child_folder[0]+"')")
         new_parameter_rowid = parent_cur.lastrowid
         db_parent.commit()
     else:
@@ -391,6 +353,12 @@ def append_db(db_parent_filename,db_filename):
     parent_cur.executemany("INSERT INTO networks VALUES(?,?,?,?,?)",network_row_data)
     db_parent.commit()
     
+    """
+    test = parent_cur.execute("SELECT * FROM networks").fetchall()
+    assert len(test) > 0, "no results in networks table"
+    print_res("networks",test,db_type="parent")
+    """
+
 
     ## -- APPEND PATTERNS -- ##
     local2newrowid = dict(parent_cur.execute(f"SELECT local_id, rowid FROM networks WHERE parameter_rowid = {new_parameter_rowid}").fetchall())
@@ -398,6 +366,15 @@ def append_db(db_parent_filename,db_filename):
     pattern_row_data = [(local2newrowid.get(a),b,c) for a,b,c in pattern_data]
     parent_cur.executemany("INSERT INTO patterns VALUES(?,?,?)",pattern_row_data)
     db_parent.commit()
+
+    """
+    test = parent_cur.execute("SELECT * FROM patterns").fetchall()
+    assert len(test) > 0, "no results in patterns table"
+    print("----CHILD----")
+    print_res("patterns",pattern_data,db_type="child")
+    print("----PARENT----")
+    print_res("patterns",test,db_type="parent")
+    """
     
 
     ## -- APPEND XTALK -- ##
