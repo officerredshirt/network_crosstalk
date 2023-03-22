@@ -35,7 +35,7 @@ def init_tables(db_filename,db_type="child"):
         return 1
 
     cur.execute("CREATE TABLE patterns(network_rowid,input,target)")
-    cur.execute("CREATE TABLE xtalk(network_rowid,target_pattern,optimized_input,output_expression,fun,jac,message,nfev,nit,njev,status,success)")
+    cur.execute("CREATE TABLE xtalk(network_rowid,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optimized_input,output_expression,fun,jac,message,nfev,nit,njev,status,success)")
 
     con.commit()
     con.close()
@@ -205,7 +205,7 @@ def get_target_patterns(db_filename,network_rowid):
 
 
 # note: local_id is used in place of network_rowid so that it can be set directly by Snakefile
-def add_xtalk(db_filename,local_id,target_pattern,optres,output_expression):
+def add_xtalk(db_filename,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression):
     if not(os.path.exists(db_filename)):
         print("error adding crosstalk result: "+db_filename+" does not exist")
         return 1
@@ -213,8 +213,9 @@ def add_xtalk(db_filename,local_id,target_pattern,optres,output_expression):
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    cur.execute("INSERT INTO xtalk VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                [local_id,target_pattern.tobytes(),optres.x.tobytes(),
+    cur.execute("INSERT INTO xtalk VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                [local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern.tobytes(),
+                 optres.x.tobytes(),
                  output_expression.tobytes(),optres.fun,optres.jac.tobytes(),
                  optres.message,optres.nfev,optres.nit,optres.njev,
                  optres.status,optres.success])
@@ -233,15 +234,15 @@ def xtalk_result_found(db_filename,network_rowid,target_pattern):
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    res_table = cur.execute(f"SELECT * FROM xtalk WHERE network_rowid = {network_rowid}").fetchall()
+    res_table = cur.execute(f"SELECT target_pattern FROM xtalk WHERE network_rowid = {network_rowid}").fetchall()
 
     con.commit()
     con.close()
 
-    patterns_already_evaluated = [np.frombuffer(x[1]) for x in res_table]
+    patterns_already_evaluated = [np.frombuffer(x[0]) for x in res_table]
 
     if len(patterns_already_evaluated) > 0:
-        return any([array_equal(target_pattern,x) for x in patterns_already_evaluated])
+        return any([np.array_equal(target_pattern,x) for x in patterns_already_evaluated])
     else:
         return False
 
@@ -261,7 +262,7 @@ def query_db(db_filename,query):
 
 # Print the provided results formatted for the appropriate
 # (specified) table.
-def print_res(db_filename,table,form="short",spec="*"):
+def print_res(db_filename,table,form="short"):
     assert (form == "short") or (form == "long"), "format must be short or long"
 
     if not(os.path.exists(db_filename)):
@@ -270,7 +271,7 @@ def print_res(db_filename,table,form="short",spec="*"):
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
-    res = cur.execute(f"SELECT {spec} FROM {table}").fetchall()
+    res = cur.execute(f"SELECT * FROM {table}").fetchall()
     col_names = get_col_names(cur)
 
     if form == "short":
@@ -314,15 +315,15 @@ def print_res(db_filename,table,form="short",spec="*"):
             print(f"network_rowid = {res[ii][0]}, input = {np.frombuffer(res[ii][1],dtype=bool)}, target = {np.frombuffer(res[ii][2])}")
         return 0
     elif table == "xtalk":
-        if not(len(res[0])) == 12:
-               print("for xtalk, res must have 12 entries")
+        if not(len(res[0])) == 15:
+               print("for xtalk, res must have 15 entries")
                return 1
 
         for ii in range(len(res)):
             if form == "short":
-                print(f"network_rowid = {res[ii][0]}, target_pattern = {np.frombuffer(res[ii][1])}, optimized_input = {np.frombuffer(res[ii][2])}, output_expression = {np.frombuffer(res[ii][3])}, fun = {res[ii][4]}")
+                print(f"network_rowid = {res[ii][0]}, minimize_noncognate_binding = {res[ii][1]}, crosslayer_crosstalk = {res[ii][2]}, tf_first_layer = {res[ii][3]}, target_pattern = {np.frombuffer(res[ii][4])}, optimized_input = {np.frombuffer(res[ii][5])}, output_expression = {np.frombuffer(res[ii][6])}, fun = {res[ii][7]}")
             else:
-                print(f"network_rowid = {res[ii][0]}, target_pattern = {np.frombuffer(res[ii][1])}, optimized_input = {np.frombuffer(res[ii][2])}, output_expression = {np.frombuffer(res[ii][3])}, fun = {res[ii][4]}, jac = {np.frombuffer(res[ii][5])}, message = "+res[ii][6]+f", nfev = {res[ii][7]}, nit = {res[ii][8]}, njev = {res[ii][9]}, status = {res[ii][10]}, success = {res[ii][11]}")
+                print(f"network_rowid = {res[ii][0]}, minimize_noncognate_binding = {res[ii][1]}, crosslayer_crosstalk = {res[ii][2]}, tf_first_layer = {res[ii][3]}, target_pattern = {np.frombuffer(res[ii][4])}, optimized_input = {np.frombuffer(res[ii][5])}, output_expression = {np.frombuffer(res[ii][6])}, fun = {res[ii][7]}, jac = {np.frombuffer(res[ii][8])}, message = {res[ii][9]}, nfev = {res[ii][10]}, nit = {res[ii][11]}, njev = {res[ii][12]}, status = {res[ii][13]}, success = {res[ii][14]}")
                    
     else:
         for ii in range(len(res)):

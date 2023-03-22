@@ -34,6 +34,7 @@ def main(argv):
     parser.add_argument("-d","--database",required=True)
     parser.add_argument("-x","--crosslayer_crosstalk",action="store_true",default=False)
     parser.add_argument("-t","--tf_first_layer",action="store_true",default=False)
+    parser.add_argument("-c","--minimize_noncognate_binding",action="store_true",default=False)
 
     args = parser.parse_args()
     filename_in = args.filename_in
@@ -41,6 +42,7 @@ def main(argv):
     database = args.database
     crosslayer_crosstalk = args.crosslayer_crosstalk
     tf_first_layer = args.tf_first_layer
+    minimize_noncognate_binding = args.minimize_noncognate_binding
     model_folder = args.model_folder
 
     local_id = manage_db.extract_local_id(filename_in)
@@ -51,23 +53,26 @@ def main(argv):
     # load target patterns
     target_patterns = manage_db.get_target_patterns(database,local_id)
 
-    # pr_gene_on is imported with tf_binding_equilibrium
+    # pr_tf_bound is imported with tf_binding_equilibrium
     if tf_first_layer:
-        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_pr_bound.out"),"rb"))
+        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_pr_tf_bound.out"),"rb"))
+        pr_chromatin_error = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_error_rate.out"),"rb"))
     else:
         pr_chromatin_open = dill.load(open(os.path.join(model_folder,"kpr_pr_open.out"), "rb"))
+        pr_chromatin_error = dill.load(open(os.path.join(model_folder,"kpr_opening_error_rate.out"),"rb"))
 
-    pr_gene_on = dill.load(open(os.path.join(model_folder,"tf_pr_bound.out"),"rb"))
+    pr_tf_bound = dill.load(open(os.path.join(model_folder,"tf_pr_bound.out"),"rb"))
+    pr_tf_error = dill.load(open(os.path.join(model_folder,"tf_error_rate.out"),"rb"))
 
 
     R_bool = (R != 0)
     T_bool = (T != 0)
     # TODO: support multiple enhancers per gene
-    if N_PF == 0:   # network is TFs only
+    if N_PF == 0:   # network is layer 2 TFs only
         def get_gene_exp(c_PF,c_TF):
             C_TF = sum(c_TF)
 
-            pr_wrapper = lambda t: pr_gene_on(C_TF,c_TF[t])
+            pr_wrapper = lambda t: pr_tf_bound(C_TF,c_TF[t])
 
             return list(map(pr_wrapper,T_bool))
 
@@ -77,16 +82,38 @@ def main(argv):
             C_TF = sum(c_TF)
             
             if crosslayer_crosstalk:
-                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])*pr_gene_on(C_TF+C_PF,c_TF[t])
+                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])*pr_tf_bound(C_TF+C_PF,c_TF[t])
             else:
-                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_gene_on(C_TF,c_TF[t])
+                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_tf_bound(C_TF,c_TF[t])
         
             return concatenate(list(map(pr_wrapper,R_bool,T_bool)))
 
+        def get_error_frac(c_PF,c_TF):
+            C_PF = sum(c_PF)
+            C_TF = sum(c_TF)
+
+            if crosslayer_crosstalk:
+                E1 = lambda r: pr_chromatin_error(C_PF+C_TF,c_PF[r])
+                E2 = lambda t: pr_tf_error(C_TF+C_PF,c_TF[t])
+            else:
+                E1 = lambda r: pr_chromatin_error(C_PF,c_PF[r])
+                E2 = lambda t: pr_tf_error(C_TF,c_TF[t])
+
+            pr_err_wrapper = lambda r,t: E1(r) + E2(t) - E1(r)*E2(t)
+            return concatenate(list(map(pr_err_wrapper,R_bool,T_bool)))
+
     # crosstalk metric
-    def crosstalk_metric(x,c_PF,c_TF):
-        d = x - get_gene_exp(c_PF,c_TF)
-        return transpose(d)@d
+    if minimize_noncognate_binding:
+        def crosstalk_metric(x,c_PF,c_TF):
+            gene_exp = get_gene_exp(c_PF,c_TF)
+            err_frac = get_error_frac(c_PF,c_TF)
+            d1 = x - gene_exp*(1-err_frac)
+            d2 = gene_exp*err_frac
+            return transpose(d1)@d1 + transpose(d2)@d2
+    else:   # patterning error
+        def crosstalk_metric(x,c_PF,c_TF):
+            d = x - get_gene_exp(c_PF,c_TF)
+            return transpose(d)@d
 
 
     if npatterns > len(target_patterns):
@@ -112,7 +139,7 @@ def main(argv):
             c_0 = [10]*(N_PF + N_TF)
             optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
             output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
-            manage_db.add_xtalk(database,local_id,target_pattern,optres,output_expression)
+            manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression)
     
 
     # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #

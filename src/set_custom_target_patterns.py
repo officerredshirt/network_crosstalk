@@ -35,18 +35,18 @@ def main(argv):
         target_pattern = zeros(M_GENE)
 
         # PFs and TFs that are present to generate this pattern
-        u = zeros([N_PF+N_TF,1])
+        u = [False]*(N_PF+N_TF)
 
         # randomly choose number active clusters
         n_active_clusters = random.randint(MIN_CLUSTERS_ACTIVE,MAX_CLUSTERS_ACTIVE+1)
-        u[0:n_active_clusters] = 1
+        u[0:n_active_clusters] = [True]*n_active_clusters
 
         # randomly assign expression levels to genes in clusters
         n_active_genes = GENES_PER_CLUSTER*n_active_clusters
-        u[N_PF:N_PF+n_active_genes] = 1
+        u[N_PF:N_PF+n_active_genes] = [True]*n_active_genes
         target_pattern[0:n_active_genes] = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,n_active_genes)
     
-        manage_db.add_pattern(database,local_id,u,target_pattern)
+        manage_db.add_pattern(database,local_id,array(u),target_pattern)
 
 
     # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
