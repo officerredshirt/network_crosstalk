@@ -99,14 +99,17 @@ def main(argv):
                 E1 = lambda r: pr_chromatin_error(C_PF,c_PF[r])
                 E2 = lambda t: pr_tf_error(C_TF,c_TF[t])
 
-            pr_err_wrapper = lambda r,t: E1(r) + E2(t) - E1(r)*E2(t)
-            return concatenate(list(map(pr_err_wrapper,R_bool,T_bool)))
+            chromatin_error = concatenate(list(map(E1,R_bool)))
+            tf_error = concatenate(list(map(E2,T_bool)))
+            total_error = chromatin_error + tf_error - chromatin_error*tf_error
+            
+            return column_stack((chromatin_error,tf_error,total_error))
 
     # crosstalk metric
     if minimize_noncognate_binding:
         def crosstalk_metric(x,c_PF,c_TF):
             gene_exp = get_gene_exp(c_PF,c_TF)
-            err_frac = get_error_frac(c_PF,c_TF)
+            err_frac = get_error_frac(c_PF,c_TF)[:,2]
             d1 = x - gene_exp*(1-err_frac)
             d2 = gene_exp*err_frac
             return transpose(d1)@d1 + transpose(d2)@d2
@@ -139,7 +142,8 @@ def main(argv):
             c_0 = [10]*(N_PF + N_TF)
             optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
             output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
-            manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression)
+            output_error = get_error_frac(optres.x[0:N_PF],optres.x[N_PF:])
+            manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error)
     
 
     # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
