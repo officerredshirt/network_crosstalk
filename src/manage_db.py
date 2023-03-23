@@ -4,6 +4,7 @@ import params
 import os, sys
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools
 
 def check_db_exists(db_filename):
     if not(os.path.exists(db_filename)):
@@ -82,7 +83,7 @@ def add_network(db_filename,local_id,R,G,T):
     parameter_rowid = cur.execute("SELECT rowid FROM parameters").fetchone()[0]
 
     # note: to undo seralization to byte representation, use numpy.frombuffer(.)
-    cur.execute("INSERT INTO networks VALUES(?,?,?,?,?)",
+    cur.execute("INSERT INTO networks(parameter_rowid,local_id,R,G,T) VALUES(?,?,?,?,?)",
                 [parameter_rowid,local_id,R.tobytes(),G.tobytes(),T.tobytes()])
 
     con.commit()
@@ -159,7 +160,7 @@ def get_formatted(db_filename,table,query=None):
             try:
                 formatted_res[ii]["output_error"] = np.frombuffer(formatted_res[ii]["output_error"])
                 formatted_res[ii]["output_error"] = np.reshape(formatted_res[ii]["output_error"],
-                                                           (round(len(output_error)/3),3))
+                                                           (round(len(formatted_res[ii]["output_error"])/3),3))
             except:
                 pass
             try:
@@ -170,10 +171,41 @@ def get_formatted(db_filename,table,query=None):
     con.close()
     return formatted_res
 
-def boxplot_error_fraction(database,folder_out):
+
+# generates boxplots of error fraction for all ON vs. OFF genes pooled across all target patterns
+def boxplot_error_fraction(db_filename,folder_out):
+    check_db_exists(db_filename)
+
     if not(os.path.exists(folder_out)):
         os.mkdir(folder_out)
 
+    res = get_formatted(db_filename,"xtalk")
+
+    network_rowids = [x["network_rowid"] for x in res]
+    unique_rowids = np.unique(network_rowids)
+
+    plt.rcParams.update({'font.size':24})
+    for cur_rowid in unique_rowids:
+        # compile patterns sharing the same network_rowid
+        cur_ix = np.isin(network_rowids,cur_rowid)
+        cur_res = list(itertools.compress(res,cur_ix))
+
+        cur_target_patterns = np.empty(sum(cur_ix),dtype=object)
+        cur_total_error_frac = np.empty(sum(cur_ix),dtype=object)
+        for ii, cur_entry in enumerate(cur_res):
+            cur_target_patterns[ii] = cur_entry["target_pattern"]
+            cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+
+        cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
+        cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
+
+        on_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns > 0))
+        off_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns == 0))
+
+        fig, ax = plt.subplots(figsize=(15,12))
+        plt.boxplot((on_error_frac,off_error_frac),labels=("ON","OFF"))
+        ax.set_title(f"rowid {cur_rowid}: error fraction pooled across {sum(cur_ix)} target patterns")
+        plt.savefig(os.path.join(folder_out,f"boxplot_error_fraction_rowid{cur_rowid}.png"))
 
 
 def plot_xtalk_results(database,folder_out):
