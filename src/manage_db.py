@@ -187,9 +187,21 @@ def boxplot_error_fraction(db_filename,folder_out):
     plt.rcParams.update({'font.size':24})
     # filter by optimization strategy, first layer (TF or chromatin), and rowid
     for metric in [0,1]:
+        if metric:
+            metric_label = "minimize noncognate binding"
+            metric_filename = "noncognate"
+        else:
+            metric_label = "patterning error"
+            metric_filename = "patterning"
         m_res = list(itertools.compress(res,[x["minimize_noncognate_binding"] == metric for x in res]))
         if len(m_res) > 0:
             for first_layer in [0,1]:
+                if first_layer:
+                    layer_label = "TF"
+                    layer_filename = "tf"
+                else:
+                    layer_label = "chromatin"
+                    layer_filename = "kpr"
                 fl_res = list(itertools.compress(m_res,[x["tf_first_layer"] == first_layer for x in m_res]))
                 if len(fl_res) > 0:
                     for cur_rowid in unique_rowids:
@@ -199,9 +211,11 @@ def boxplot_error_fraction(db_filename,folder_out):
 
                         cur_target_patterns = np.empty(num_cur_res,dtype=object)
                         cur_total_error_frac = np.empty(num_cur_res,dtype=object)
+                        cur_metric = np.empty(num_cur_res)
                         for ii, cur_entry in enumerate(cur_res):
                             cur_target_patterns[ii] = cur_entry["target_pattern"]
                             cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+                            cur_metric[ii] = cur_entry["fun"]
 
                         cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
                         cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
@@ -209,26 +223,16 @@ def boxplot_error_fraction(db_filename,folder_out):
                         on_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns > 0))
                         off_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns == 0))
 
-                        fig, ax = plt.subplots(figsize=(15,12))
-                        plt.boxplot((on_error_frac,off_error_frac),labels=("ON","OFF"))
+                        fig, (ax1,ax2) = plt.subplots(2,figsize=(15,24))
+                        ax1.boxplot((on_error_frac,off_error_frac),labels=("ON","OFF"))
+                        ax2.boxplot(cur_metric)
+                        ax2.set_title(metric_label)
 
-                        filename = f"boxplot_error_fraction_rowid{cur_rowid}"
-                        title_str = f"rowid {cur_rowid}: error fraction pooled across {num_cur_res} target patterns"
-                        if metric:
-                            title_str = title_str + " (minimize noncognate binding, "
-                            filename = filename + "_noncognate"
-                        else:
-                            title_str = title_str + " (minimize patterning error, "
-                            filename = filename + "_patterning"
-
-                        if first_layer:
-                            title_str = title_str + "TF first layer)"
-                            filename = filename + "_tf"
-                        else:
-                            title_str = title_str + "chromatin first layer)"
-                            filename = filename + "_kpr"
-                        ax.set_title(title_str,wrap=True)
-                        plt.savefig(os.path.join(folder_out,f"{filename}.png"))
+                        filename = f"boxplot_error_fraction_rowid{cur_rowid}_{metric_filename}_{layer_filename}"
+                        title_str = f"rowid {cur_rowid}: error fraction pooled across {num_cur_res} target patterns ({metric_label}, {layer_label} first layer)"
+                        ax1.set_title(title_str,wrap=True)
+                        plt.savefig(os.path.join(folder_out,f"{filename}.png")) 
+    plt.close("all")
 
 
 def plot_xtalk_results(database,folder_out):
@@ -289,6 +293,7 @@ def plot_xtalk_results(database,folder_out):
             ax2.set_title(f"target pattern = {N_ON} ON, {N_OFF} OFF")
 
         plt.savefig(os.path.join(folder_out,f"rowid{network_rowid}_{ii}.png"))
+        plt.close("all")
 
 
 # Add a target pattern to the database.

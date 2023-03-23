@@ -32,7 +32,7 @@ def main(argv):
     # one PF per cluster of GENES_PER_CLUSTER genes
     R = zeros([M_ENH,N_PF])
     for ii in range(0,N_PF):
-        R[ii:ii+GENES_PER_CLUSTER,ii] = 1
+        R[ii*GENES_PER_CLUSTER:(ii+1)*GENES_PER_CLUSTER,ii] = 1
 
     # T (M_ENH x N_TF): connections from TFs to enhancers
     T = identity(M_GENE)

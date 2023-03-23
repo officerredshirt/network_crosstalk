@@ -66,10 +66,12 @@ def main(argv):
     pr_tf_bound = dill.load(open(os.path.join(model_folder,"tf_pr_bound.out"),"rb"))
     pr_tf_error = dill.load(open(os.path.join(model_folder,"tf_error_rate.out"),"rb"))
 
+    max_concentration = 1e20
+    max_expression = pr_chromatin_open(max_concentration,max_concentration)*pr_tf_bound(max_concentration,max_concentration)
 
     R_bool = (R != 0)
     T_bool = (T != 0)
-    # TODO: support multiple enhancers per gene
+
     if N_PF == 0:   # network is layer 2 TFs only
         def get_gene_exp(c_PF,c_TF):
             C_TF = sum(c_TF)
@@ -88,7 +90,7 @@ def main(argv):
             else:
                 pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_tf_bound(C_TF,c_TF[t])
         
-            return concatenate(list(map(pr_wrapper,R_bool,T_bool)))
+            return concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
 
         def get_error_frac(c_PF,c_TF):
             C_PF = sum(c_PF)
