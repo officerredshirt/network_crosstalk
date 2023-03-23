@@ -185,27 +185,50 @@ def boxplot_error_fraction(db_filename,folder_out):
     unique_rowids = np.unique(network_rowids)
 
     plt.rcParams.update({'font.size':24})
-    for cur_rowid in unique_rowids:
-        # compile patterns sharing the same network_rowid
-        cur_ix = np.isin(network_rowids,cur_rowid)
-        cur_res = list(itertools.compress(res,cur_ix))
+    # filter by optimization strategy, first layer (TF or chromatin), and rowid
+    for metric in [0,1]:
+        m_res = list(itertools.compress(res,[x["minimize_noncognate_binding"] == metric for x in res]))
+        if len(m_res) > 0:
+            for first_layer in [0,1]:
+                fl_res = list(itertools.compress(m_res,[x["tf_first_layer"] == first_layer for x in m_res]))
+                if len(fl_res) > 0:
+                    for cur_rowid in unique_rowids:
+                        # compile patterns sharing the same network_rowid
+                        cur_res = list(itertools.compress(fl_res,np.isin(network_rowids,cur_rowid)))
+                        num_cur_res = len(cur_res)
 
-        cur_target_patterns = np.empty(sum(cur_ix),dtype=object)
-        cur_total_error_frac = np.empty(sum(cur_ix),dtype=object)
-        for ii, cur_entry in enumerate(cur_res):
-            cur_target_patterns[ii] = cur_entry["target_pattern"]
-            cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+                        cur_target_patterns = np.empty(num_cur_res,dtype=object)
+                        cur_total_error_frac = np.empty(num_cur_res,dtype=object)
+                        for ii, cur_entry in enumerate(cur_res):
+                            cur_target_patterns[ii] = cur_entry["target_pattern"]
+                            cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
 
-        cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
-        cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
+                        cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
+                        cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
 
-        on_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns > 0))
-        off_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns == 0))
+                        on_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns > 0))
+                        off_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns == 0))
 
-        fig, ax = plt.subplots(figsize=(15,12))
-        plt.boxplot((on_error_frac,off_error_frac),labels=("ON","OFF"))
-        ax.set_title(f"rowid {cur_rowid}: error fraction pooled across {sum(cur_ix)} target patterns")
-        plt.savefig(os.path.join(folder_out,f"boxplot_error_fraction_rowid{cur_rowid}.png"))
+                        fig, ax = plt.subplots(figsize=(15,12))
+                        plt.boxplot((on_error_frac,off_error_frac),labels=("ON","OFF"))
+
+                        filename = f"boxplot_error_fraction_rowid{cur_rowid}"
+                        title_str = f"rowid {cur_rowid}: error fraction pooled across {num_cur_res} target patterns"
+                        if metric:
+                            title_str = title_str + " (minimize noncognate binding, "
+                            filename = filename + "_noncognate"
+                        else:
+                            title_str = title_str + " (minimize patterning error, "
+                            filename = filename + "_patterning"
+
+                        if first_layer:
+                            title_str = title_str + "TF first layer)"
+                            filename = filename + "_tf"
+                        else:
+                            title_str = title_str + "chromatin first layer)"
+                            filename = filename + "_kpr"
+                        ax.set_title(title_str,wrap=True)
+                        plt.savefig(os.path.join(folder_out,f"{filename}.png"))
 
 
 def plot_xtalk_results(database,folder_out):
@@ -270,9 +293,7 @@ def plot_xtalk_results(database,folder_out):
 
 # Add a target pattern to the database.
 def add_pattern(db_filename,local_id,inp,out):
-    if not(os.path.exists(db_filename)):
-        print("error adding pattern: "+db_filename+" does not exist")
-        return 1
+    check_db_exists(db_filename)
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
@@ -287,9 +308,7 @@ def add_pattern(db_filename,local_id,inp,out):
 
 # Return unique target patterns for network with specified id.
 def get_target_patterns(db_filename,network_rowid):
-    if not(os.path.exists(db_filename)):
-        print("error getting target pattern: "+db_filename+" does not exist")
-        return 1
+    check_db_exists(db_filename)
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
@@ -305,9 +324,7 @@ def get_target_patterns(db_filename,network_rowid):
 
 # note: local_id is used in place of network_rowid so that it can be set directly by Snakefile
 def add_xtalk(db_filename,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error):
-    if not(os.path.exists(db_filename)):
-        print("error adding crosstalk result: "+db_filename+" does not exist")
-        return 1
+    check_db_exists(db_filename)
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
@@ -326,16 +343,15 @@ def add_xtalk(db_filename,local_id,minimize_noncognate_binding,crosslayer_crosst
     return 0
 
 # Returns True if a crosstalk result has already been calculated
-# for the given network and target pattern.
-def xtalk_result_found(db_filename,network_rowid,target_pattern):
-    if not(os.path.exists(db_filename)):
-        print("error finding crosstalk result: "+db_filename+" does not exist")
-        return 1
+# for the given network, target pattern, patterning metric, and
+# first layer (chromatin or TF).
+def xtalk_result_found(db_filename,network_rowid,minimize_noncognate_binding,tf_first_layer,target_pattern):
+    check_db_exists(db_filename)
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    res_table = cur.execute(f"SELECT target_pattern FROM xtalk WHERE network_rowid = {network_rowid}").fetchall()
+    res_table = cur.execute(f"SELECT target_pattern FROM xtalk WHERE network_rowid = {network_rowid} AND minimize_noncognate_binding = {minimize_noncognate_binding} AND tf_first_layer = {tf_first_layer}").fetchall()
 
     con.commit()
     con.close()
@@ -349,9 +365,7 @@ def xtalk_result_found(db_filename,network_rowid,target_pattern):
 
 # Query the database.
 def query_db(db_filename,query):
-    if not(os.path.exists(db_filename)):
-        print("error querying database: "+db_filename+" does not exist")
-        return 1
+    check_db_exists(db_filename)
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()

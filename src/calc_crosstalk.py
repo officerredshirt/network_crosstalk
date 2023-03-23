@@ -35,6 +35,7 @@ def main(argv):
     parser.add_argument("-x","--crosslayer_crosstalk",action="store_true",default=False)
     parser.add_argument("-t","--tf_first_layer",action="store_true",default=False)
     parser.add_argument("-c","--minimize_noncognate_binding",action="store_true",default=False)
+    parser.add_argument("-s","--suppress_filesave",action="store_true",default=False)
 
     args = parser.parse_args()
     filename_in = args.filename_in
@@ -44,6 +45,7 @@ def main(argv):
     tf_first_layer = args.tf_first_layer
     minimize_noncognate_binding = args.minimize_noncognate_binding
     model_folder = args.model_folder
+    suppress_filesave = args.suppress_filesave
 
     local_id = manage_db.extract_local_id(filename_in)
 
@@ -55,7 +57,7 @@ def main(argv):
 
     # pr_tf_bound is imported with tf_binding_equilibrium
     if tf_first_layer:
-        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_pr_tf_bound.out"),"rb"))
+        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_pr_bound.out"),"rb"))
         pr_chromatin_error = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_error_rate.out"),"rb"))
     else:
         pr_chromatin_open = dill.load(open(os.path.join(model_folder,"kpr_pr_open.out"), "rb"))
@@ -137,7 +139,7 @@ def main(argv):
 
         bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
 
-        if not(manage_db.xtalk_result_found(database,local_id,target_pattern)):
+        if not(manage_db.xtalk_result_found(database,local_id,int(minimize_noncognate_binding),int(tf_first_layer),target_pattern)):
             # starting point
             c_0 = [10]*(N_PF + N_TF)
             optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
@@ -147,8 +149,9 @@ def main(argv):
     
 
     # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
-    with open(filename_in + ".xtalk","w") as file:
-        pass
+    if not suppress_filesave:
+        with open(filename_in + ".xtalk","w") as file:
+            pass
 
     # tend = time.perf_counter()
     # print(f"elapsed time = {tend - tstart}")

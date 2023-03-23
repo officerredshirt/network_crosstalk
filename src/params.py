@@ -25,10 +25,10 @@ K_S = kh_Sm/kh_Sp  # TF binding dissociation rate (specific)
 #K_NS = 100000      # TF binding dissociation rate (nonspecific)
 K_NS = kh_NSm/kh_NSp    # s-1
 
-# TARGET PATTERN
-NUM_TARGETS = 10        # number random target patterns to generate
-MIN_CLUSTERS_ACTIVE = 1 # minimum number of clusters containing expressing genes
-MAX_CLUSTERS_ACTIVE = 5 # maximum number of clusters containing expressing genes
+# TARGET PATTERNS
+NUM_TARGETS = 1        # number random target patterns to generate
+MIN_CLUSTERS_ACTIVE = 2 # minimum number of clusters containing expressing genes
+MAX_CLUSTERS_ACTIVE = 2 # maximum number of clusters containing expressing genes
 MIN_EXPRESSION = 0.3    # minimum expression level for a gene in a target pattern
 MAX_EXPRESSION = 0.9    # maximum expression level for a gene in a target pattern
 
