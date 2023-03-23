@@ -17,7 +17,8 @@ rule all:
 	input:
 		expand(RESDIR+"{id}.xtalk",id=IDS)
 	shell:
-		"mkdir "+CLUSTER_DIR+"; cp -r Snakefile "+DIR+"src sm.sh " +CLUSTER_DIR+"||:; mv -b "+RESDIR+" "+CLUSTER_DIR
+		"mkdir "+CLUSTER_DIR+"; cp -r Snakefile "+DIR+"src sm.sh " +CLUSTER_DIR+ \
+            "||:; mv -b "+RESDIR+" "+CLUSTER_DIR
 
 rule gen_models:
     output:
@@ -47,4 +48,7 @@ rule get_crosstalk:
 	output:
 		RESDIR+"{id}.xtalk"
 	shell:
-		DIR+"src/calc_crosstalk.py -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH+" -n 1"
+		DIR+"src/calc_crosstalk.py -s -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
+            + "; "+DIR+"src/calc_crosstalk.py -s -t -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
+		    + "; "+DIR+"src/calc_crosstalk.py -s -c -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
+		    + "; "+DIR+"src/calc_crosstalk.py -t -c -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH

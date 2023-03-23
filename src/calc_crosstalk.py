@@ -129,6 +129,8 @@ def main(argv):
         
 
     # tstart = time.perf_counter()
+    print(f"Calculating crosstalk (minimize_noncognate_binding = {minimize_noncognate_binding}, tf_first_layer = {tf_first_layer})")
+    print("  ",end="")
     for ii, target_pattern in enumerate(target_patterns):
         if ii >= npatterns:
             break
@@ -140,16 +142,24 @@ def main(argv):
         bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
 
         if not(manage_db.xtalk_result_found(database,local_id,int(minimize_noncognate_binding),int(tf_first_layer),target_pattern)):
+            print(".",end="",flush=True)
             # starting point
             c_0 = [10]*(N_PF + N_TF)
-            optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
-            output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
-            output_error = get_error_frac(optres.x[0:N_PF],optres.x[N_PF:])
-            manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error)
+            try:
+                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
+                output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
+                output_error = get_error_frac(optres.x[0:N_PF],optres.x[N_PF:])
+                manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error)
+                print("! ",end="",flush=True)
+            except:
+                print("optimization error; skipping...")
+                pass
     
+    print("")
 
     # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
     if not suppress_filesave:
+        print("Saving proof of completion...")
         with open(filename_in + ".xtalk","w") as file:
             pass
 

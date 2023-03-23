@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # ARCHITECTURE
-N_PF = 5                # number pioneer factors
+N_PF = 10               # number pioneer factors
 N_CLUSTERS = N_PF       # number clusters
 GENES_PER_CLUSTER = 5   # number genes per cluster
 M_GENE = GENES_PER_CLUSTER*N_CLUSTERS   # number genes
@@ -26,9 +26,9 @@ K_S = kh_Sm/kh_Sp  # TF binding dissociation rate (specific)
 K_NS = kh_NSm/kh_NSp    # s-1
 
 # TARGET PATTERNS
-NUM_TARGETS = 1        # number random target patterns to generate
-MIN_CLUSTERS_ACTIVE = 2 # minimum number of clusters containing expressing genes
-MAX_CLUSTERS_ACTIVE = 2 # maximum number of clusters containing expressing genes
+NUM_TARGETS = 100       # number random target patterns to generate
+MIN_CLUSTERS_ACTIVE = 3 # minimum number of clusters containing expressing genes
+MAX_CLUSTERS_ACTIVE = 3 # maximum number of clusters containing expressing genes
 MIN_EXPRESSION = 0.3    # minimum expression level for a gene in a target pattern
 MAX_EXPRESSION = 0.9    # maximum expression level for a gene in a target pattern
 
