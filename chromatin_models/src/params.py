@@ -11,3 +11,4 @@ k_neq = 0.05    # s-1
 K_S = kh_Sm/kh_Sp  # TF binding dissociation rate (specific)
 #K_NS = 100000      # TF binding dissociation rate (nonspecific)
 K_NS = kh_NSm/kh_NSp    # s-1
+#K_NS = 100

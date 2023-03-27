@@ -49,6 +49,6 @@ rule get_crosstalk:
 		RESDIR+"{id}.xtalk"
 	shell:
 		DIR+"src/calc_crosstalk.py -s -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
-            + "; "+DIR+"src/calc_crosstalk.py -s -t -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
+            + "; "+DIR+"src/calc_crosstalk.py -s -t -x -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
 		    + "; "+DIR+"src/calc_crosstalk.py -s -c -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH \
-		    + "; "+DIR+"src/calc_crosstalk.py -t -c -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH
+		    + "; "+DIR+"src/calc_crosstalk.py -c -t -x -m "+RESDIR+" -i "+RESDIR+"{wildcards.id} -d "+DATABASE_PATH

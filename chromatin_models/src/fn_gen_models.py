@@ -73,7 +73,7 @@ def main(argv):
 
     # "normal" model (with K_NS, K_S in params.py)
     tf_pr_bound = sym.lambdify((C,c_S),(1 - 1/(c_S/K_S + (C-c_S)/K_NS + 1)),"numpy")
-    tf_error_rate = sym.lambdify((C,c_S),((C-c_S)/K_NS)/((C-c_S)/K_NS+ c_S/K_S),"numpy")
+    tf_error_rate = sym.lambdify((C,c_S),((C-c_S)/K_NS)/((C-c_S)/K_NS + c_S/K_S),"numpy")
 
     dill.dump(tf_pr_bound, open(os.path.join(output_folder,"tf_pr_bound.out"),"wb"))
     dill.dump(tf_error_rate, open(os.path.join(output_folder,"tf_error_rate.out"),"wb"))

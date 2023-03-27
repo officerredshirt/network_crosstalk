@@ -1,3 +1,5 @@
 *.log
 test_res/*
 *snakemake/metadata*
+cluster*
+__pycache__

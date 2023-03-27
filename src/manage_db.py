@@ -43,7 +43,7 @@ def init_tables(db_filename,db_type="child"):
         return 1
 
     cur.execute("CREATE TABLE patterns(network_rowid,input,target)")
-    cur.execute("CREATE TABLE xtalk(network_rowid,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optimized_input,output_expression,output_error,fun,jac,message,nfev,nit,njev,status,success)")
+    cur.execute("CREATE TABLE xtalk(network_rowid,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optimized_input,output_expression,output_error,max_expression,fun,jac,message,nfev,nit,njev,status,success)")
 
     con.commit()
     con.close()
@@ -171,9 +171,76 @@ def get_formatted(db_filename,table,query=None):
     con.close()
     return formatted_res
 
+def plot_xtalk_errors(db_filename,folder_out):
+    plot_error_contributions(db_filename,folder_out)
+    plot_error_fraction(db_filename,folder_out)
+    return 0
 
-# generates boxplots of error fraction for all ON vs. OFF genes pooled across all target patterns
-def boxplot_error_fraction(db_filename,folder_out):
+def plot_error_contributions(db_filename,folder_out):
+    check_db_exists(db_filename)
+
+    if not(os.path.exists(folder_out)):
+        os.mkdir(folder_out)
+
+    res = get_formatted(db_filename,"xtalk")
+
+    patterr_res = list(itertools.compress(res,[x["minimize_noncognate_binding"] == 0 for x in res]))
+    if len(patterr_res) == 0:
+        print("no results found using patterning error as metric")
+        return 1
+
+    network_rowids = [x["network_rowid"] for x in patterr_res]
+    unique_rowids = np.unique(network_rowids)
+    
+    plt.rcParams.update({'font.size':24})
+
+    for cur_rowid in unique_rowids:
+        cur_res = list(itertools.compress(patterr_res,np.isin(network_rowids,cur_rowid)))
+        num_cur_res = len(cur_res)
+
+        cur_target_patterns = np.empty(num_cur_res,dtype=object)
+        cur_total_error_frac = np.empty(num_cur_res,dtype=object)
+        cur_output_expression = np.empty(num_cur_res,dtype=object)
+        cur_layer = np.empty(num_cur_res)
+        for ii, cur_entry in enumerate(cur_res):
+            cur_target_patterns[ii] = cur_entry["target_pattern"]
+            cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+            cur_output_expression[ii] = cur_entry["output_expression"]
+            cur_layer[ii] = cur_entry["tf_first_layer"]
+
+        cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
+        cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
+        cur_output_expression = np.concatenate(tuple(cur_output_expression))
+
+        on_ix = cur_target_patterns > 0
+        off_ix = cur_target_patterns == 0
+
+        on_expression = list(itertools.compress(cur_output_expression,on_ix))
+        off_error_frac = list(itertools.compress(cur_total_error_frac,off_ix))
+
+        metric_abs_errs = cur_output_expression - cur_target_patterns
+        metric_abs_errs = metric_abs_errs*np.abs(metric_abs_errs) # preserve sign
+        metric_abs_errs_on = list(itertools.compress(metric_abs_errs,on_ix))
+        metric_abs_errs_off = list(itertools.compress(metric_abs_errs,off_ix))
+
+        metric_abs_errs_on_tf = list(itertools.compress(metric_abs_errs_on,cur_layer==1))
+        metric_abs_errs_off_tf = list(itertools.compress(metric_abs_errs_off,cur_layer==1))
+        metric_abs_errs_on_kpr = list(itertools.compress(metric_abs_errs_on,cur_layer==0))
+        metric_abs_errs_off_kpr = list(itertools.compress(metric_abs_errs_off,cur_layer==0))
+            
+        fig, ((ax1,ax2)) = plt.subplots(1,2,figsize=(30,12))
+
+        ax1.boxplot((metric_abs_errs_on_tf,metric_abs_errs_on_kpr),labels=("TF","chromatin"))
+        ax1.set_title(f"patterning error terms, ON genes",wrap=True)
+
+        ax2.boxplot((metric_abs_errs_off_tf,metric_abs_errs_off_kpr),labels=("TF","chromatin"))
+        ax2.set_title(f"patterning error terms, OFF genes",wrap=True)
+        
+        plt.savefig(os.path.join(folder_out,f"patterning_error_contributions_rowid{cur_rowid}.png")) 
+
+
+# generates plots of error fraction for all ON vs. OFF genes pooled across all target patterns
+def plot_error_fraction(db_filename,folder_out):
     check_db_exists(db_filename)
 
     if not(os.path.exists(folder_out)):
@@ -211,26 +278,42 @@ def boxplot_error_fraction(db_filename,folder_out):
 
                         cur_target_patterns = np.empty(num_cur_res,dtype=object)
                         cur_total_error_frac = np.empty(num_cur_res,dtype=object)
+                        cur_output_expression = np.empty(num_cur_res,dtype=object)
                         cur_metric = np.empty(num_cur_res)
                         for ii, cur_entry in enumerate(cur_res):
                             cur_target_patterns[ii] = cur_entry["target_pattern"]
                             cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+                            cur_output_expression[ii] = cur_entry["output_expression"]
                             cur_metric[ii] = cur_entry["fun"]
 
                         cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
                         cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
+                        cur_output_expression = np.concatenate(tuple(cur_output_expression))
 
-                        on_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns > 0))
-                        off_error_frac = list(itertools.compress(cur_total_error_frac,cur_target_patterns == 0))
+                        on_ix = cur_target_patterns > 0
+                        off_ix = cur_target_patterns == 0
 
-                        fig, (ax1,ax2) = plt.subplots(2,figsize=(15,24))
-                        ax1.boxplot((on_error_frac,off_error_frac),labels=("ON","OFF"))
-                        ax2.boxplot(cur_metric)
+                        on_expression = list(itertools.compress(cur_output_expression,on_ix))
+                        on_error_frac = list(itertools.compress(cur_total_error_frac,on_ix))
+                        on_noncog_exp = np.array(on_error_frac)*np.array(on_expression)
+
+                        off_error_frac = list(itertools.compress(cur_total_error_frac,off_ix))
+                        off_expression = list(itertools.compress(cur_output_expression,off_ix))
+
+
+                        fig, ((ax1,ax2,ax3)) = plt.subplots(1,3,figsize=(45,12))
+
+                        ax1.hist(on_error_frac)
+                        filename = f"error_fraction_rowid{cur_rowid}_{metric_filename}_{layer_filename}"
+                        title_str = f"rowid {cur_rowid}: ON error fraction, {num_cur_res} target patterns ({layer_label} first layer)"
+                        ax1.set_title(title_str,wrap=True)
+
+                        ax2.hist(cur_metric)
                         ax2.set_title(metric_label)
 
-                        filename = f"boxplot_error_fraction_rowid{cur_rowid}_{metric_filename}_{layer_filename}"
-                        title_str = f"rowid {cur_rowid}: error fraction pooled across {num_cur_res} target patterns ({metric_label}, {layer_label} first layer)"
-                        ax1.set_title(title_str,wrap=True)
+                        ax3.hist(on_noncog_exp)
+                        ax3.set_title("ON expression due to noncognate binding")
+
                         plt.savefig(os.path.join(folder_out,f"{filename}.png")) 
     plt.close("all")
 
@@ -328,17 +411,18 @@ def get_target_patterns(db_filename,network_rowid):
 
 
 # note: local_id is used in place of network_rowid so that it can be set directly by Snakefile
-def add_xtalk(db_filename,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error):
+def add_xtalk(db_filename,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression):
     check_db_exists(db_filename)
 
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    cur.execute("INSERT INTO xtalk (network_rowid,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optimized_input,output_expression,output_error,fun,jac,message,nfev,nit,njev,status,success) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    cur.execute("INSERT INTO xtalk (network_rowid,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optimized_input,output_expression,output_error,max_expression,fun,jac,message,nfev,nit,njev,status,success) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,
                  target_pattern.tobytes(),
                  optres.x.tobytes(),
                  output_expression.tobytes(),output_error.tobytes(),
+                 max_expression,
                  optres.fun,optres.jac.tobytes(),
                  optres.message,optres.nfev,optres.nit,optres.njev,
                  optres.status,optres.success])

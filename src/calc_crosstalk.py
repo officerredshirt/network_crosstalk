@@ -151,7 +151,7 @@ def main(argv):
                 optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
                 output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
                 output_error = get_error_frac(optres.x[0:N_PF],optres.x[N_PF:])
-                manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error)
+                manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression)
                 print("! ",end="",flush=True)
             except:
                 print("optimization error; skipping...")

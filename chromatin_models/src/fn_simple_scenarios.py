@@ -394,7 +394,7 @@ def main(argv):
             print(f"    Optimizing crosstalk...")
             def objfun(c):
                 return xtalk_objective_fn_scenario(sc,c[0],c[1])
-            optres = optimize.minimize(objfun,C0,tol=eps,bounds=[(0,np.inf)]*2)
+            optres = optimize.minimize(objfun,C0,tol=eps,bounds=[(0,np.inf)]*len(C0))
             optimal_C = optres.x
             optimal_xtalk = optres.fun
             gen_bar_expression_level(sc,optimal_C,f"{prefix}_scenario{sc}_expression_at_min_xtalk")
@@ -404,10 +404,12 @@ def main(argv):
 
         gen_contourf(xtalk_scenario,f"{prefix}_scenario{sc}_xtalk_contour",xtalk_vmax,optimal_C,optimal_xtalk)
 
+        """
         entries_on, coeffs, pr, err, labs = xtalk_on_off_exp(sc)(optimal_C[0],optimal_C[1])
         pr_exp = prob_expressing(pr)
         get_pr_at_contour(sc,0,pr_exp[0],"Cl1",optimal_C)
         get_pr_at_contour(sc,1,pr_exp[1],"Cl2",optimal_C)
+        """
 
         plt.close("all")
     
