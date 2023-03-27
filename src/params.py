@@ -22,7 +22,7 @@ k_neq = 0.05    # s-1
 THETA = 1     # number TFs per enhancer (layer 2)
 n = 1         # number binding sites per TF (layer 2)
 K_S = kh_Sm/kh_Sp  # TF binding dissociation rate (specific), s-1
-K_NS = 100000      # TF binding dissociation rate (nonspecific), s-1
+K_NS = 100      # TF binding dissociation rate (nonspecific), s-1
 
 # TARGET PATTERNS
 NUM_TARGETS = 10        # number random target patterns to generate
