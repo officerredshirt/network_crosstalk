@@ -5,7 +5,9 @@ import pprint
 import params
 import os, sys
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
+import dill
 import itertools
 
 def check_db_exists(db_filename):
@@ -22,6 +24,7 @@ def get_param_names():
 
 def get_col_names(cur):
     return list(map(lambda x: x[0], cur.description))
+
 
 # Initialize the parameter, network, pattern, and crosstalk tables in the database.
 def init_tables(db_filename,db_type="child"):
@@ -173,10 +176,29 @@ def get_formatted(db_filename,table,query=None):
     con.close()
     return formatted_res
 
-def plot_xtalk_errors(db_filename,folder_out):
-    plot_error_contributions(db_filename,folder_out)
-    plot_error_fraction(db_filename,folder_out)
+def plot_xtalk_errors(db_folder,folder_out):
+    plot_error_contributions(os.path.join(db_folder,"local_db.db"),folder_out)
+    plot_error_fraction(db_folder,folder_out)
     return 0
+
+
+# Return elements of arr where corresponding index in ixs is true.
+def logical_ix(arr,ixs):
+    if not len(arr) == len(ixs):
+        print("error: for logical indexing arr must be same length as ixs")
+        return
+    return list(itertools.compress(arr,ixs))
+
+# Scatterplot where "valid" results are green and "invalid" results are red.
+def scatter_valid(ax,x,y,val_ixs,lab="data"):
+    x_valid = logical_ix(x,val_ixs)
+    x_invalid = logical_ix(x,np.invert(val_ixs))
+
+    y_valid = logical_ix(y,val_ixs)
+    y_invalid = logical_ix(y,np.invert(val_ixs))
+
+    ax.scatter(x_invalid,y_invalid,c="r",label=lab)
+    ax.scatter(x_valid,y_valid,c="g",label=lab)
 
 def plot_error_contributions(db_filename,folder_out):
     check_db_exists(db_filename)
@@ -186,7 +208,7 @@ def plot_error_contributions(db_filename,folder_out):
 
     res = get_formatted(db_filename,"xtalk")
 
-    patterr_res = list(itertools.compress(res,[x["minimize_noncognate_binding"] == 0 for x in res]))
+    patterr_res = logical_ix(res,[x["minimize_noncognate_binding"] == 0 for x in res])
     if len(patterr_res) == 0:
         print("no results found using patterning error as metric")
         return 1
@@ -197,65 +219,77 @@ def plot_error_contributions(db_filename,folder_out):
     plt.rcParams.update({'font.size':24})
 
     for cur_rowid in unique_rowids:
-        cur_res = list(itertools.compress(patterr_res,np.isin(network_rowids,cur_rowid)))
+        cur_res = logical_ix(patterr_res,np.isin(network_rowids,cur_rowid))
         num_cur_res = len(cur_res)
 
-        cur_target_patterns = np.empty(num_cur_res,dtype=object)
-        cur_total_error_frac = np.empty(num_cur_res,dtype=object)
-        cur_output_expression = np.empty(num_cur_res,dtype=object)
-        cur_layer = np.empty(num_cur_res)
-        for ii, cur_entry in enumerate(cur_res):
-            cur_target_patterns[ii] = cur_entry["target_pattern"]
-            cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
-            cur_output_expression[ii] = cur_entry["output_expression"]
-            cur_layer[ii] = cur_entry["tf_first_layer"]
+        if num_cur_res > 0:
+            cur_target_patterns = np.empty(num_cur_res,dtype=object)
+            cur_total_error_frac = np.empty(num_cur_res,dtype=object)
+            cur_output_expression = np.empty(num_cur_res,dtype=object)
+            cur_layer = np.empty(num_cur_res)
+            for ii, cur_entry in enumerate(cur_res):
+                cur_target_patterns[ii] = cur_entry["target_pattern"]
+                cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+                cur_output_expression[ii] = cur_entry["output_expression"]
+                cur_layer[ii] = cur_entry["tf_first_layer"]
 
-        cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
-        cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
-        cur_output_expression = np.concatenate(tuple(cur_output_expression))
+            cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
+            cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
+            cur_output_expression = np.concatenate(tuple(cur_output_expression))
 
-        on_ix = cur_target_patterns > 0
-        off_ix = cur_target_patterns == 0
+            on_ix = cur_target_patterns > 0
+            off_ix = cur_target_patterns == 0
 
-        tf_ix = np.repeat(cur_layer==1,len(cur_entry["target_pattern"]))
-        kpr_ix = np.repeat(cur_layer==0,len(cur_entry["target_pattern"]))
+            tf_ix = np.repeat(cur_layer==1,len(cur_entry["target_pattern"]))
+            kpr_ix = np.repeat(cur_layer==0,len(cur_entry["target_pattern"]))
 
-        cur_target_patterns_on_tf = list(itertools.compress(cur_target_patterns,np.logical_and(on_ix,tf_ix)))
-        cur_target_patterns_on_kpr = list(itertools.compress(cur_target_patterns,np.logical_and(on_ix,kpr_ix)))
+            cur_target_patterns_on_tf = logical_ix(cur_target_patterns,np.logical_and(on_ix,tf_ix))
+            cur_target_patterns_on_kpr = logical_ix(cur_target_patterns,np.logical_and(on_ix,kpr_ix))
 
-        on_expression = list(itertools.compress(cur_output_expression,on_ix))
-        off_error_frac = list(itertools.compress(cur_total_error_frac,off_ix))
+            on_expression = logical_ix(cur_output_expression,on_ix)
+            off_error_frac = logical_ix(cur_total_error_frac,off_ix)
 
-        metric_abs_errs = cur_output_expression - cur_target_patterns
-        metric_abs_errs = metric_abs_errs*np.abs(metric_abs_errs) # preserve sign
+            metric_abs_errs = cur_output_expression - cur_target_patterns
+            metric_abs_errs = metric_abs_errs*np.abs(metric_abs_errs) # preserve sign
 
-        metric_abs_errs_on_tf = np.array(list(itertools.compress(metric_abs_errs,np.logical_and(on_ix,tf_ix))))
-        metric_abs_errs_off_tf = np.array(list(itertools.compress(metric_abs_errs,np.logical_and(off_ix,tf_ix))))
-        metric_abs_errs_on_kpr = np.array(list(itertools.compress(metric_abs_errs,np.logical_and(on_ix,kpr_ix))))
-        metric_abs_errs_off_kpr = np.array(list(itertools.compress(metric_abs_errs,np.logical_and(off_ix,kpr_ix))))
+            metric_abs_errs_on_tf = np.array(logical_ix(metric_abs_errs,np.logical_and(on_ix,tf_ix)))
+            metric_abs_errs_off_tf = np.array(logical_ix(metric_abs_errs,np.logical_and(off_ix,tf_ix)))
+            metric_abs_errs_on_kpr = np.array(logical_ix(metric_abs_errs,np.logical_and(on_ix,kpr_ix)))
+            metric_abs_errs_off_kpr = np.array(logical_ix(metric_abs_errs,np.logical_and(off_ix,kpr_ix)))
 
 
-        fig, ((ax1,ax2,ax3)) = plt.subplots(1,3,figsize=(45,12))
+            fig, ((ax1,ax2,ax3)) = plt.subplots(1,3,figsize=(45,24))
 
-        ax1.boxplot((metric_abs_errs_on_tf,abs(metric_abs_errs_on_tf),metric_abs_errs_on_kpr,abs(metric_abs_errs_on_kpr)),labels=("TF (signed)","TF","chromatin (signed)","chromatin"))
-        ax1.set_title(f"patterning error terms, ON genes",wrap=True)
+            ax1.boxplot((metric_abs_errs_on_tf,abs(metric_abs_errs_on_tf),metric_abs_errs_on_kpr,abs(metric_abs_errs_on_kpr)),labels=("TF (signed)","TF","chromatin (signed)","chromatin"))
+            ax1.set_title(f"patterning error terms, ON genes",wrap=True)
 
-        ax2.boxplot((metric_abs_errs_off_tf,metric_abs_errs_off_kpr),labels=("TF","chromatin"))
-        ax2.set_title(f"patterning error terms, OFF genes",wrap=True)
+            ax2.boxplot((metric_abs_errs_off_tf,metric_abs_errs_off_kpr),labels=("TF","chromatin"))
+            ax2.set_title(f"patterning error terms, OFF genes",wrap=True)
 
-        ax3.scatter(cur_target_patterns_on_tf,metric_abs_errs_on_tf,label="TF")
-        ax3.scatter(cur_target_patterns_on_kpr,metric_abs_errs_on_kpr,label="chromatin")
-        ax3.set_xlabel("target expression")
-        ax3.set_ylabel("patterning error term (signed)")
-        ax3.legend()
-        
-        plt.savefig(os.path.join(folder_out,f"patterning_error_contributions_rowid{cur_rowid}.png")) 
+            ax3.scatter(cur_target_patterns_on_tf,metric_abs_errs_on_tf,label="TF")
+            ax3.scatter(cur_target_patterns_on_kpr,metric_abs_errs_on_kpr,label="chromatin")
+            ax3.set_xlabel("target expression")
+            ax3.set_ylabel("patterning error term (signed)")
+            ax3.legend()
+            
+            plt.savefig(os.path.join(folder_out,f"patterning_error_contributions_rowid{cur_rowid}.png")) 
+
+
+def load_pr_on(db_folder):
+    tf_chrom_equiv_pr_bound = dill.load(open(os.path.join(db_folder,"tf_chrom_equiv_pr_bound.out"),"rb"))
+    kpr_pr_open = dill.load(open(os.path.join(db_folder,"kpr_pr_open.out"),"rb"))
+    tf_pr_bound = dill.load(open(os.path.join(db_folder,"tf_pr_bound.out"),"rb"))
+
+    return (tf_chrom_equiv_pr_bound,kpr_pr_open,tf_pr_bound)
 
 
 # generates plots of error fraction for all ON vs. OFF genes pooled across all target patterns
 # NOTE: assumes one-to-one mapping from Layer 2 factors to target genes
-def plot_error_fraction(db_filename,folder_out):
+def plot_error_fraction(db_folder,folder_out):
+    db_filename = os.path.join(db_folder,"local_db.db")
     check_db_exists(db_filename)
+
+    (tf_chrom_equiv_pr_bound,kpr_pr_open,tf_pr_bound) = load_pr_on(db_folder)
 
     if not(os.path.exists(folder_out)):
         os.mkdir(folder_out)
@@ -269,12 +303,12 @@ def plot_error_fraction(db_filename,folder_out):
     # filter by optimization strategy, first layer (TF or chromatin), and rowid
     for metric in [0,1]:
         if metric:
-            metric_label = "minimize noncognate binding"
+            metric_label = "noncognate binding error"
             metric_filename = "noncognate"
         else:
             metric_label = "patterning error"
             metric_filename = "patterning"
-        m_res = list(itertools.compress(res,[x["minimize_noncognate_binding"] == metric for x in res]))
+        m_res = logical_ix(res,[x["minimize_noncognate_binding"] == metric for x in res])
         if len(m_res) > 0:
             for first_layer in [0,1]:
                 if first_layer:
@@ -283,35 +317,39 @@ def plot_error_fraction(db_filename,folder_out):
                 else:
                     layer_label = "chromatin"
                     layer_filename = "kpr"
-                fl_res = list(itertools.compress(m_res,[x["tf_first_layer"] == first_layer for x in m_res]))
+                fl_res = logical_ix(m_res,[x["tf_first_layer"] == first_layer for x in m_res])
                 if len(fl_res) > 0:
+                    cur_network_rowids = [x["network_rowid"] for x in fl_res]
                     for cur_rowid in unique_rowids:
                         parameter_rowid = query_db(db_filename,f"SELECT parameter_rowid FROM networks WHERE local_id = {cur_rowid}")[0][0]
                         (N_PF,N_TF) = query_db(db_filename,f"SELECT N_PF, N_TF from parameters WHERE rowid = {parameter_rowid}")[0]
                         (R,T,G) = get_network(db_filename,cur_rowid)
 
                         # compile patterns sharing the same network_rowid
-                        cur_res = list(itertools.compress(fl_res,np.isin(network_rowids,cur_rowid)))
+                        cur_res = logical_ix(fl_res,np.isin(cur_network_rowids,cur_rowid))
+                        val_res_ix = [x["success"] == 1 for x in cur_res]#["CONVERGENCE" in x["message"] for x in cur_res]
                         num_cur_res = len(cur_res)
 
                         cur_target_patterns = np.empty(num_cur_res,dtype=object)
                         cur_total_error_frac = np.empty(num_cur_res,dtype=object)
                         cur_output_expression = np.empty(num_cur_res,dtype=object)
                         cur_optimized_input = np.empty(num_cur_res,dtype=object)
-                        cur_cluster_min_expression = np.empty(num_cur_res,dtype=object)
+                        cur_cluster_mean_expression = np.empty(num_cur_res,dtype=object)
                         cur_metric = np.empty(num_cur_res)
+                        cur_mean_on_expression = np.empty(num_cur_res)
                         for ii, cur_entry in enumerate(cur_res):
                             cur_target_patterns[ii] = cur_entry["target_pattern"]
                             cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
                             cur_output_expression[ii] = cur_entry["output_expression"]
                             cur_optimized_input[ii] = cur_entry["optimized_input"]
                             cur_metric[ii] = cur_entry["fun"]
+                            cur_mean_on_expression[ii] = np.mean(logical_ix(cur_output_expression[ii],cur_target_patterns[ii] > 0))
 
                             # gene to PF mapping
                             gene_to_pf = np.matmul(G,R)
-                            cur_cluster_min_expression[ii] = np.empty(N_PF,dtype=object)
+                            cur_cluster_mean_expression[ii] = np.empty(N_PF,dtype=object)
                             for ii_cluster in range(N_PF):
-                                cur_cluster_min_expression[ii][ii_cluster] = min(list(itertools.compress(cur_target_patterns[ii],gene_to_pf[:,ii_cluster] == 1)))
+                                cur_cluster_mean_expression[ii][ii_cluster] = np.mean(logical_ix(cur_target_patterns[ii],gene_to_pf[:,ii_cluster] == 1))
 
                         pf_ix = [False]*(N_TF+N_PF)
                         pf_ix[0:N_PF] = [True]*N_PF
@@ -321,55 +359,97 @@ def plot_error_fraction(db_filename,folder_out):
                         cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
                         cur_output_expression = np.concatenate(tuple(cur_output_expression))
                         cur_optimized_input = np.concatenate(tuple(cur_optimized_input))
-                        cur_cluster_min_expression = np.concatenate(tuple(cur_cluster_min_expression))
+                        cur_cluster_mean_expression = np.concatenate(tuple(cur_cluster_mean_expression))
+
 
                         on_ix = cur_target_patterns > 0
                         off_ix = cur_target_patterns == 0
 
-                        on_expression = list(itertools.compress(cur_output_expression,on_ix))
-                        on_error_frac = list(itertools.compress(cur_total_error_frac,on_ix))
+                        on_expression = logical_ix(cur_output_expression,on_ix)
+                        on_error_frac = logical_ix(cur_total_error_frac,on_ix)
                         on_noncog_exp = np.array(on_error_frac)*np.array(on_expression)
 
-                        off_error_frac = list(itertools.compress(cur_total_error_frac,off_ix))
-                        off_expression = list(itertools.compress(cur_output_expression,off_ix))
+                        off_error_frac = logical_ix(cur_total_error_frac,off_ix)
+                        off_expression = logical_ix(cur_output_expression,off_ix)
 
                         pf_ix = np.tile(pf_ix,len(cur_res))
-                        pf_optimized_input = list(itertools.compress(cur_optimized_input,pf_ix))
-                        tf_optimized_input = list(itertools.compress(cur_optimized_input,np.invert(pf_ix)))
+                        pf_optimized_input = np.array(logical_ix(cur_optimized_input,pf_ix))
+                        tf_optimized_input = np.array(logical_ix(cur_optimized_input,np.invert(pf_ix)))
+
+                        total_pf_concentration_per_pf_per_pattern = np.tile(np.sum(pf_optimized_input.reshape(len(cur_res),N_PF),axis=1),N_PF)
+                        total_tf_concentration_per_tf_per_pattern = np.tile(np.sum(tf_optimized_input.reshape(len(cur_res),N_TF),axis=1),N_TF)
+                        
+                        if layer_filename == "kpr":
+                            pf_optimized_pr_on = np.array(list(map(kpr_pr_open,total_pf_concentration_per_pf_per_pattern,pf_optimized_input)))/cur_entry["max_expression"]
+                        else:
+                            pf_optimized_pr_on = np.array(list(map(tf_chrom_equiv_pr_bound,total_pf_concentration_per_pf_per_pattern,pf_optimized_input)))
+                        tf_optimized_pr_bound = np.array(list(map(tf_pr_bound,total_tf_concentration_per_tf_per_pattern,tf_optimized_input)))
 
 
-                        fig, ((ax1,ax2,ax3),(ax4,ax5,ax6)) = plt.subplots(2,3,figsize=(45,24))
+                        fig, ((ax1,ax2,ax3),(ax4,ax5,ax6),(ax7,ax8,ax9)) = plt.subplots(3,3,figsize=(45,36))
 
                         filename = f"error_fraction_rowid{cur_rowid}_{metric_filename}_{layer_filename}"
                         title_str = f"rowid {cur_rowid}: ON error fraction, {num_cur_res} target patterns ({layer_label} first layer)"
 
-                        #ax1.scatter(cur_target_patterns,cur_total_error_frac)
-                        ax1.scatter(list(itertools.compress(cur_target_patterns,on_ix)),
-                                    on_error_frac)
+                        val_pat_ix = np.repeat(val_res_ix,round(len(cur_target_patterns)/num_cur_res))
+                        ax1.plot([0,1],[0,1],color="gray",linewidth=5)
+                        scatter_valid(ax1,cur_target_patterns,cur_output_expression,val_pat_ix)
                         ax1.set_xlabel("target expression level")
-                        ax1.set_ylabel("total error fraction (ON genes)")
+                        ax1.set_ylabel("actual expression level")
 
-                        ax2.hist(cur_metric)
-                        ax2.set_title(metric_label)
+                        scatter_valid(ax2,logical_ix(cur_target_patterns,on_ix),
+                                    on_error_frac,logical_ix(val_pat_ix,on_ix))
+                        ax2.set_xlabel("target expression level")
+                        ax2.set_ylabel("total error fraction (ON genes)")
 
-                        ax3.scatter(cur_target_patterns,cur_output_expression*cur_total_error_frac)
+                        noncog_expression = cur_output_expression*cur_total_error_frac
+                        scatter_valid(ax3,cur_target_patterns,noncog_expression,val_pat_ix)
                         ax3.set_xlabel("target expression level")
                         ax3.set_ylabel("total expression level * error fraction")
-                        ax3.set_title("expression due to noncognate binding")
 
-                        ax4.scatter(cur_cluster_min_expression,pf_optimized_input)
-                        ax4.set_xlabel("minimum target expression in cluster")
-                        ax4.set_ylabel("layer 1 concentration for corresponding cluster")
-                        ax4.set_title("optimal Layer 1 regulatory factor concentrations",wrap=True)
+                        scatter_valid(ax4,cur_mean_on_expression,cur_metric,val_res_ix)
+                        ax4.set_xlabel("mean expression of ON genes")
+                        ax4.set_ylabel(metric_label)
 
-                        ax5.scatter(cur_target_patterns,tf_optimized_input)
-                        ax5.set_xlabel("target expression level")
-                        ax5.set_ylabel("layer 2 TF concentration for corresponding target")
+                        val_cluster_ix = np.repeat(val_res_ix,round(len(cur_cluster_mean_expression)/num_cur_res))
+                        scatter_valid(ax5,cur_cluster_mean_expression,pf_optimized_input,val_cluster_ix)
+                        ax5.set_xlabel("mean target expression in cluster")
+                        ax5.set_ylabel("layer 1 concentration for corresponding cluster")
 
-                        ax6.plot([0,1],[0,1],color="gray")
-                        ax6.scatter(cur_target_patterns,cur_output_expression)
+                        tf_sweep = np.linspace(min(tf_optimized_input),max(tf_optimized_input),100)
+                        layer2_induction_no_xtalk = np.array(list(map(tf_pr_bound,tf_sweep,tf_sweep)))
+                        ax6.plot(layer2_induction_no_xtalk,tf_sweep,color="gray",linewidth=5)
+                        scatter_valid(ax6,cur_target_patterns,tf_optimized_input,val_pat_ix)
                         ax6.set_xlabel("target expression level")
-                        ax6.set_ylabel("actual expression level")
+                        ax6.set_ylabel("layer 2 TF concentration for corresponding target")
+
+                        # idealized curve: given a concentration of noncogate factors,
+                        # what specific layer 2 concentration would give exactly the
+                        # target expression level? (ignoring layer 1 binding)
+
+                        def objective_fn(c_NS,c_S,target):
+                            return tf_pr_bound(c_NS+c_S,c_S) - target
+
+                        # solve for C_S with fixed C_NS s.t. tf_pr_bound = target_expression
+                        layer2_c_S_given_noncog = np.zeros(len(cur_target_patterns))
+                        for ii, ii_target in enumerate(cur_target_patterns):
+                            cur_c_NS = total_tf_concentration_per_tf_per_pattern[ii] - tf_optimized_input[ii]
+                            layer2_c_S_given_noncog[ii] = scipy.optimize.fsolve(lambda x: objective_fn(cur_c_NS,x,ii_target),tf_optimized_input[ii])
+
+                        ax7.plot(layer2_induction_no_xtalk,tf_sweep,color="gray",linewidth=5)
+                        ax7.scatter(cur_target_patterns,tf_optimized_input,c="b")
+                        scatter_valid(ax7,cur_target_patterns,layer2_c_S_given_noncog,val_pat_ix)
+                        ax7.set_xlabel("target expression level")
+                        ax7.set_ylabel("layer 2 TF concentration given noncognate concentration")
+
+                        scatter_valid(ax8,cur_cluster_mean_expression,pf_optimized_pr_on,val_cluster_ix)
+                        ax8.set_xlabel("mean target expression in cluster")
+                        ax8.set_ylabel("probability layer 1 on")
+
+                        ax9.plot([0,1],[0,1],color="gray",linewidth=5)
+                        scatter_valid(ax9,cur_target_patterns,tf_optimized_pr_bound,val_pat_ix)
+                        ax9.set_xlabel("target expression level")
+                        ax9.set_ylabel("probability layer 2 bound")
 
                         plt.savefig(os.path.join(folder_out,f"{filename}.png")) 
     plt.close("all")
@@ -454,17 +534,8 @@ def add_pattern(db_filename,local_id,inp,out):
 # Return unique target patterns for network with specified id.
 def get_target_patterns(db_filename,network_rowid):
     check_db_exists(db_filename)
-
-    con = sqlite3.connect(db_filename)
-    cur = con.cursor()
-
-    res = cur.execute(f"SELECT target FROM patterns WHERE network_rowid = {network_rowid}").fetchall()
-
-    con.commit()
-    con.close()
-
-    target_patterns = [np.frombuffer(x[0]) for x in res]
-    return list(map(np.array,set(map(tuple,target_patterns))))
+    res = get_formatted(db_filename,"patterns",f"SELECT input, target FROM patterns WHERE network_rowid = {network_rowid}")
+    return [x["input"] for x in res], [x["target"] for x in res]
 
 
 # note: local_id is used in place of network_rowid so that it can be set directly by Snakefile
@@ -509,6 +580,7 @@ def xtalk_result_found(db_filename,network_rowid,minimize_noncognate_binding,tf_
     else:
         return False
 
+
 # Query the database.
 def query_db(db_filename,query):
     check_db_exists(db_filename)
@@ -520,6 +592,7 @@ def query_db(db_filename,query):
 
     con.close()
     return res
+
 
 # Print the provided results formatted for the appropriate
 # (specified) table.

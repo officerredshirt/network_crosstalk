@@ -13,13 +13,14 @@ def main(argv):
 
     args = parser.parse_args()
     folder = args.folder
-    database = os.path.join(folder,"res","local_db.db")
+    #database = os.path.join(folder,"res","local_db.db")
 
-    assert os.path.exists(database), "database " + database + " does not exist"
+    #assert os.path.exists(database), "database " + database + " does not exist"
 
     output_folder = os.path.join(folder,"plots")
 
-    manage_db.plot_xtalk_errors(database,output_folder)
+    #manage_db.plot_xtalk_errors(database,output_folder)
+    manage_db.plot_xtalk_errors(os.path.join(folder,"res"),output_folder)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

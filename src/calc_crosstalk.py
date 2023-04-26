@@ -4,8 +4,9 @@
 from numpy import *
 from scipy import optimize
 from multiprocess import Pool
+import itertools
 import dill
-# import time
+import time
 import matplotlib.pyplot as plt
 import os, sys, argparse
 # from memory_profiler import profile, memory_usage
@@ -53,7 +54,7 @@ def main(argv):
     R, T, G = manage_db.get_network(database,local_id)
 
     # load target patterns
-    target_patterns = manage_db.get_target_patterns(database,local_id)
+    input_for_target, target_patterns = manage_db.get_target_patterns(database,local_id)
 
     # pr_tf_bound is imported with tf_binding_equilibrium
     if tf_first_layer:
@@ -130,10 +131,11 @@ def main(argv):
         sys.exit(2)
         
 
-    # tstart = time.perf_counter()
+    tstart = time.perf_counter()
     print(f"Calculating crosstalk (minimize_noncognate_binding = {minimize_noncognate_binding}, tf_first_layer = {tf_first_layer})")
     print("  ",end="")
     for ii, target_pattern in enumerate(target_patterns):
+        cur_input = input_for_target[ii]
         if ii >= npatterns:
             break
 
@@ -146,27 +148,29 @@ def main(argv):
         if not(manage_db.xtalk_result_found(database,local_id,int(minimize_noncognate_binding),int(tf_first_layer),target_pattern)):
             print(".",end="",flush=True)
             # starting point
-            c_0 = [10]*(N_PF + N_TF)
+            c_0 = array([10]*(N_PF + N_TF))
+            #c_0[cur_input] = 10 
             try:
-                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds)
+                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
+                                           method = "L-BFGS-B", options = {"maxfun":1000000})
                 output_expression = get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
                 output_error = get_error_frac(optres.x[0:N_PF],optres.x[N_PF:])
                 manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression)
                 print("! ",end="",flush=True)
-            except:
-                print("optimization error; skipping...")
+            except Exception as e:
+                print(f"optimization error \"{e}\"; skipping...")
                 pass
     
     print("")
 
     # -- SAVE PROOF OF COMPLETION FOR SNAKEMAKE FLOW -- #
-    if not suppress_filesave:
-        print("Saving proof of completion...")
-        with open(filename_in + ".xtalk","w") as file:
-            pass
 
-    # tend = time.perf_counter()
-    # print(f"elapsed time = {tend - tstart}")
+    print("Saving proof of completion...")
+    with open(filename_in + ".xtalk","w") as file:
+        pass
+
+    tend = time.perf_counter()
+    print(f"elapsed time = {tend - tstart}")
     # print(f"memory usage = {mem_usage}")
 
 
