@@ -27,13 +27,12 @@ def main(argv):
 
     assert os.path.exists(database), "database " + database + " does not exist"
 
-    print(plot_db.convert_to_dataframe(database))
-    
+    #plot_db.convert_to_dataframe(database)
 
-    """
     print("PARAMETERS")
     manage_db.print_res(database,"parameters")
     print("")
+    """
 
     print("NETWORKS")
     manage_db.print_res(database,"networks")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for d in temp; do
+for d in cluster_2023-05-12_0911*; do
     echo "Generating plots for folder $d..."
     python3 ./src/gen_plots.py $d
     echo "Done."

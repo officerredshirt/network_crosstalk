@@ -105,6 +105,7 @@ def get_network(db_filename,local_id):
     return arch[0]["R"], arch[0]["T"], arch[0]["G"]
 
 
+# Return results for the specified table formatted appropriately.
 def get_formatted(db_filename,table,query=None):
     check_db_exists(db_filename)
 
@@ -172,9 +173,43 @@ def get_formatted(db_filename,table,query=None):
                 formatted_res[ii]["jac"] = np.frombuffer(formatted_res[ii]["jac"])
             except:
                 pass
+            try:
+                formatted_res[ii]["layer2_cS_for_fixed_other_cNS"] = np.frombuffer(formatted_res[ii]["layer2_cS_for_fixed_other_cNS"])
+            except:
+                pass
 
     con.close()
     return formatted_res
+
+
+# idealized curve: given a concentration of noncogate factors,
+# what specific layer 2 concentration would give exactly the
+# target expression level? (ignoring layer 1 binding)
+def calc_optimal_cS_for_fixed_other_cNS(db_filename):
+    check_db_exists(db_filename)
+
+    # add column to database if doesn't exist
+    con = sqlite3.connect(db_filename)
+    cur = con.cursor()
+    if "layer2_cS_for_fixed_other_cNS" not in [x[1] for x in cur.execute("PRAGMA table_info(xtalk)")]:
+        cur.execute("ALTER TABLE xtalk ADD COLUMN layer2_cS_for_fixed_other_cNS")
+
+    res = get_formatted(db_filename,"xtalk")
+
+    def objective_fn(c_NS,c_S,target):
+        return tf_pr_bound(c_NS+c_S,c_S) - target
+
+    for ii, target in enumerate(res["target_pattern"]):
+        if res["layer2_cS_for_fixed_other_cNS"][ii] == None:
+            layer2_cS_given_noncog = np.zeros(len(res["target_pattern"][0]))
+            for ii_gene, target_level in enumerate(target):
+                cur_C_NS = np.sum(res["optimized_input"][ii]) - res["optimized_input"][ii][ii_gene]
+                layer2_cS_given_noncog[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(cur_C_NS,x,target),res["optimized_input"][ii][ii_gene])
+        cur.execute(f"UPDATE xtalk SET layer2_cS_for_fixed_other_cNS = {layer2_cS_given_noncog.tobytes()} WHERE network_rowid = {res['network_rowid'][ii]}")
+
+    con.close()
+    #TODO: back up databases, test this function, add to compile_results, use in plotting
+
 
 def plot_xtalk_errors(db_folder,folder_out):
     plot_error_contributions(os.path.join(db_folder,"local_db.db"),folder_out)
@@ -189,6 +224,7 @@ def logical_ix(arr,ixs):
         return
     return list(itertools.compress(arr,ixs))
 
+
 # Scatterplot where "valid" results are green and "invalid" results are red.
 def scatter_valid(ax,x,y,val_ixs,lab="data"):
     x_valid = logical_ix(x,val_ixs)
@@ -199,6 +235,7 @@ def scatter_valid(ax,x,y,val_ixs,lab="data"):
 
     ax.scatter(x_invalid,y_invalid,c="r",label=lab)
     ax.scatter(x_valid,y_valid,c="g",label=lab)
+
 
 def plot_error_contributions(db_filename,folder_out):
     check_db_exists(db_filename)
@@ -223,27 +260,12 @@ def plot_error_contributions(db_filename,folder_out):
         num_cur_res = len(cur_res)
 
         if num_cur_res > 0:
-            cur_target_patterns = np.empty(num_cur_res,dtype=object)
-            cur_total_error_frac = np.empty(num_cur_res,dtype=object)
-            cur_output_expression = np.empty(num_cur_res,dtype=object)
-            cur_layer = np.empty(num_cur_res)
-            for ii, cur_entry in enumerate(cur_res):
-                cur_target_patterns[ii] = cur_entry["target_pattern"]
-                cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
-                cur_output_expression[ii] = cur_entry["output_expression"]
-                cur_layer[ii] = cur_entry["tf_first_layer"]
+            cur_target_patterns, cur_total_error_frac, cur_output_expression, _, _, _, cur_layer, _, _, _, _, on_ix, off_ix = compile_results(cur_res)
 
-            cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
-            cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
-            cur_output_expression = np.concatenate(tuple(cur_output_expression))
+            tf_only_ix = np.repeat(cur_layer==1,len(cur_res[0]["target_pattern"]))
+            kpr_ix = np.repeat(cur_layer==0,len(cur_res[0]["target_pattern"]))
 
-            on_ix = cur_target_patterns > 0
-            off_ix = cur_target_patterns == 0
-
-            tf_ix = np.repeat(cur_layer==1,len(cur_entry["target_pattern"]))
-            kpr_ix = np.repeat(cur_layer==0,len(cur_entry["target_pattern"]))
-
-            cur_target_patterns_on_tf = logical_ix(cur_target_patterns,np.logical_and(on_ix,tf_ix))
+            cur_target_patterns_on_tf = logical_ix(cur_target_patterns,np.logical_and(on_ix,tf_only_ix))
             cur_target_patterns_on_kpr = logical_ix(cur_target_patterns,np.logical_and(on_ix,kpr_ix))
 
             on_expression = logical_ix(cur_output_expression,on_ix)
@@ -252,8 +274,8 @@ def plot_error_contributions(db_filename,folder_out):
             metric_abs_errs = cur_output_expression - cur_target_patterns
             metric_abs_errs = metric_abs_errs*np.abs(metric_abs_errs) # preserve sign
 
-            metric_abs_errs_on_tf = np.array(logical_ix(metric_abs_errs,np.logical_and(on_ix,tf_ix)))
-            metric_abs_errs_off_tf = np.array(logical_ix(metric_abs_errs,np.logical_and(off_ix,tf_ix)))
+            metric_abs_errs_on_tf = np.array(logical_ix(metric_abs_errs,np.logical_and(on_ix,tf_only_ix)))
+            metric_abs_errs_off_tf = np.array(logical_ix(metric_abs_errs,np.logical_and(off_ix,tf_only_ix)))
             metric_abs_errs_on_kpr = np.array(logical_ix(metric_abs_errs,np.logical_and(on_ix,kpr_ix)))
             metric_abs_errs_off_kpr = np.array(logical_ix(metric_abs_errs,np.logical_and(off_ix,kpr_ix)))
 
@@ -281,6 +303,60 @@ def load_pr_on(db_folder):
     tf_pr_bound = dill.load(open(os.path.join(db_folder,"tf_pr_bound.out"),"rb"))
 
     return (tf_chrom_equiv_pr_bound,kpr_pr_open,tf_pr_bound)
+
+
+def compile_results(cur_res,N_PF=[],N_TF=[],R=[],G=[]):
+    val_res_ix = [x["success"] == 1 for x in cur_res]
+    num_cur_res = len(cur_res)
+
+    cur_target_patterns = np.empty(num_cur_res,dtype=object)
+    cur_total_error_frac = np.empty(num_cur_res,dtype=object)
+    cur_output_expression = np.empty(num_cur_res,dtype=object)
+    cur_optimized_input = np.empty(num_cur_res,dtype=object)
+    cur_cluster_mean_expression = np.empty(num_cur_res,dtype=object)
+    cur_metric = np.empty(num_cur_res)
+    cur_layer = np.empty(num_cur_res)
+    cur_mean_on_expression = np.empty(num_cur_res)
+    for ii, cur_entry in enumerate(cur_res):
+        cur_target_patterns[ii] = cur_entry["target_pattern"]
+        cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
+        cur_output_expression[ii] = cur_entry["output_expression"]
+        cur_optimized_input[ii] = cur_entry["optimized_input"]
+        cur_metric[ii] = cur_entry["fun"]
+        cur_mean_on_expression[ii] = np.mean(logical_ix(cur_output_expression[ii],cur_target_patterns[ii] > 0))
+        cur_layer[ii] = cur_entry["tf_first_layer"]
+
+        if not G == [] and not R == [] and not N_PF == []:
+            # gene to PF mapping
+            gene_to_pf = np.matmul(G,R)
+            cur_cluster_mean_expression[ii] = np.empty(N_PF,dtype=object)
+            for ii_cluster in range(N_PF):
+                cur_cluster_mean_expression[ii][ii_cluster] = np.mean(logical_ix(cur_target_patterns[ii],gene_to_pf[:,ii_cluster] == 1))
+        elif ii == 0:
+            print("no R, G, N_PF provided; skipping current cluster mean expression")
+
+    if not N_PF == [] and not N_TF == []:
+        pf_ix = [False]*(N_TF+N_PF)
+        pf_ix[0:N_PF] = [True]*N_PF
+        tf_ix = np.invert(pf_ix)
+    else:
+        print("no N_TF, N_PF provided; skipping pf_ix, tf_ix")
+        pf_ix = []
+        tf_ix = []
+
+    cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
+    cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
+    cur_output_expression = np.concatenate(tuple(cur_output_expression))
+    cur_optimized_input = np.concatenate(tuple(cur_optimized_input))
+    try:
+        cur_cluster_mean_expression = np.concatenate(tuple(cur_cluster_mean_expression))
+    except:
+        pass
+
+    on_ix = cur_target_patterns > 0
+    off_ix = cur_target_patterns == 0
+
+    return cur_target_patterns, cur_total_error_frac, cur_output_expression, cur_optimized_input, cur_cluster_mean_expression, cur_metric, cur_layer, cur_mean_on_expression, val_res_ix, pf_ix, tf_ix, on_ix, off_ix
 
 
 # generates plots of error fraction for all ON vs. OFF genes pooled across all target patterns
@@ -327,43 +403,8 @@ def plot_error_fraction(db_folder,folder_out):
 
                         # compile patterns sharing the same network_rowid
                         cur_res = logical_ix(fl_res,np.isin(cur_network_rowids,cur_rowid))
-                        val_res_ix = [x["success"] == 1 for x in cur_res]#["CONVERGENCE" in x["message"] for x in cur_res]
                         num_cur_res = len(cur_res)
-
-                        cur_target_patterns = np.empty(num_cur_res,dtype=object)
-                        cur_total_error_frac = np.empty(num_cur_res,dtype=object)
-                        cur_output_expression = np.empty(num_cur_res,dtype=object)
-                        cur_optimized_input = np.empty(num_cur_res,dtype=object)
-                        cur_cluster_mean_expression = np.empty(num_cur_res,dtype=object)
-                        cur_metric = np.empty(num_cur_res)
-                        cur_mean_on_expression = np.empty(num_cur_res)
-                        for ii, cur_entry in enumerate(cur_res):
-                            cur_target_patterns[ii] = cur_entry["target_pattern"]
-                            cur_total_error_frac[ii] = cur_entry["output_error"][:,2]
-                            cur_output_expression[ii] = cur_entry["output_expression"]
-                            cur_optimized_input[ii] = cur_entry["optimized_input"]
-                            cur_metric[ii] = cur_entry["fun"]
-                            cur_mean_on_expression[ii] = np.mean(logical_ix(cur_output_expression[ii],cur_target_patterns[ii] > 0))
-
-                            # gene to PF mapping
-                            gene_to_pf = np.matmul(G,R)
-                            cur_cluster_mean_expression[ii] = np.empty(N_PF,dtype=object)
-                            for ii_cluster in range(N_PF):
-                                cur_cluster_mean_expression[ii][ii_cluster] = np.mean(logical_ix(cur_target_patterns[ii],gene_to_pf[:,ii_cluster] == 1))
-
-                        pf_ix = [False]*(N_TF+N_PF)
-                        pf_ix[0:N_PF] = [True]*N_PF
-                        tf_ix = np.invert(pf_ix)
-
-                        cur_target_patterns = np.concatenate(tuple(cur_target_patterns))
-                        cur_total_error_frac = np.concatenate(tuple(cur_total_error_frac))
-                        cur_output_expression = np.concatenate(tuple(cur_output_expression))
-                        cur_optimized_input = np.concatenate(tuple(cur_optimized_input))
-                        cur_cluster_mean_expression = np.concatenate(tuple(cur_cluster_mean_expression))
-
-
-                        on_ix = cur_target_patterns > 0
-                        off_ix = cur_target_patterns == 0
+                        cur_target_patterns, cur_total_error_frac, cur_output_expression, cur_optimized_input, cur_cluster_mean_expression, cur_metric, cur_layer, cur_mean_on_expression, val_res_ix, pf_ix, tf_ix, on_ix, off_ix = compile_results(cur_res,N_PF,N_TF,R,G)
 
                         on_expression = logical_ix(cur_output_expression,on_ix)
                         on_error_frac = logical_ix(cur_total_error_frac,on_ix)
@@ -380,7 +421,7 @@ def plot_error_fraction(db_folder,folder_out):
                         total_tf_concentration_per_tf_per_pattern = np.tile(np.sum(tf_optimized_input.reshape(len(cur_res),N_TF),axis=1),N_TF)
                         
                         if layer_filename == "kpr":
-                            pf_optimized_pr_on = np.array(list(map(kpr_pr_open,total_pf_concentration_per_pf_per_pattern,pf_optimized_input)))/cur_entry["max_expression"]
+                            pf_optimized_pr_on = np.array(list(map(kpr_pr_open,total_pf_concentration_per_pf_per_pattern,pf_optimized_input)))/cur_res[0]["max_expression"]
                         else:
                             pf_optimized_pr_on = np.array(list(map(tf_chrom_equiv_pr_bound,total_pf_concentration_per_pf_per_pattern,pf_optimized_input)))
                         tf_optimized_pr_bound = np.array(list(map(tf_pr_bound,total_tf_concentration_per_tf_per_pattern,tf_optimized_input)))
