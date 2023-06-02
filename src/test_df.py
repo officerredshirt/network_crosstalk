@@ -18,6 +18,8 @@ def main(argv):
     args = parser.parse_args()
     databases = args.databases
 
+    COMBINED_RESULTS = "../combined_res.csv"
+
     db_filenames = []
     for database in databases:
         ext = os.path.splitext(database)[1]
@@ -31,32 +33,21 @@ def main(argv):
         assert os.path.exists(database), "database " + database + " does not exist"
         db_filenames.append(database)
 
-    df = plot_db.combine_databases(db_filenames)
-    #print(df.columns.values.tolist())
-    #print(df.loc[df["K_NS"] == 10000])
-    #gb = df.groupby(["K_NS","M_GENE"],group_keys=True)
-    #print(dict(list(gb)))
-    #print(gb.get_group((10000,150)))
-    plot_db.boxplot_groupby("test_patt_err.png",df.loc[df["minimize_noncognate_binding"] == 0],["tf_first_layer","K_NS","M_GENE"],plot_db.error_by_gene)
-    plot_db.boxplot_groupby("test_noncog.png",df.loc[df["minimize_noncognate_binding"] == 1],["tf_first_layer","K_NS","M_GENE"],plot_db.error_by_gene)
+    if os.path.exists(COMBINED_RESULTS):
+        df = pandas.read_csv(COMBINED_RESULTS)
+        df = plot_db.combine_databases(db_filenames,df=df)
+    else:
+        df = plot_db.combine_databases(db_filenames)
+    df = df.loc[df["K_NS"] > 100]
+    df = df.loc[df["success"] == 1]
+    df = plot_db.calc_modulating_concentrations(df)
+    df.to_csv(COMBINED_RESULTS)
 
-    """
-    print("PARAMETERS")
-    manage_db.print_res(database,"parameters")
-    print("")
-
-    print("NETWORKS")
-    manage_db.print_res(database,"networks")
-    print("")
-
-    print("PATTERNS")
-    manage_db.print_res(database,"patterns")
-    print("")
-    
-    print("XTALK")
-    manage_db.print_res(database,"xtalk")
-    print("")
-    """
+    #plot_db.temp_plot(df)
+    prefixes = ['patterning','noncognate_binding']
+    for mnb in [0,1]:
+        plot_db.subplots_groupby(df.loc[df["minimize_noncognate_binding"] == mnb],"K_NS",["M_GENE","MAX_CLUSTERS_ACTIVE"],plot_db.ratio_xtalk_chromatin_tf_by_pair,filename=f"../plots/ratio_{prefixes[mnb]}_error.png",title=f"log ratio of {prefixes[mnb].replace('_',' ')} error in chromatin to equivalent TF networks")
+        plot_db.subplots_groupby(df.loc[df["minimize_noncognate_binding"] == mnb],"K_NS",["M_GENE","MAX_CLUSTERS_ACTIVE","tf_first_layer"],plot_db.xtalk_by_gene,filename=f"../plots/{prefixes[mnb]}_by_gene.png",title=f"log {prefixes[mnb].replace('_',' ')} error per gene")
 
 
 if __name__ == "__main__":
