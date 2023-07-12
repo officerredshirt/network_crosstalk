@@ -134,11 +134,8 @@ def main(argv):
     tstart = time.perf_counter()
     print(f"Calculating crosstalk (minimize_noncognate_binding = {minimize_noncognate_binding}, tf_first_layer = {tf_first_layer})")
     print("  ",end="")
-    for ii, target_pattern in enumerate(target_patterns):
-        cur_input = input_for_target[ii]
-        if ii >= npatterns:
-            break
 
+    def optim(target_pattern):
         # optimize concentration of PFs and TFs in the input to reduce crosstalk metric
         def crosstalk_objective_fn(c):
             return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
@@ -160,6 +157,9 @@ def main(argv):
             except Exception as e:
                 print(f"optimization error \"{e}\"; skipping...")
                 pass
+
+    with Pool() as pool:
+        pool.map(optim,target_patterns[0:npatterns])
     
     print("")
 

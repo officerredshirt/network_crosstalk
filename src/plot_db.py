@@ -64,9 +64,19 @@ def combine_databases(db_filenames,df=[]):
 # HOW DOES CHROMATIN ADVANTAGE OVER TF SCALE WITH GENOME SIZE?
 # - boxplot patterning error/gene vs. "genome size" at different specificities
 
+def row_calc_patterning_error(df):
+    d = df["output_expression"] - df["target_pattern"]
+    return d@d
+
+
+def patterning_error(df):
+    return df.apply(row_calc_patterning_error,axis=1).apply(np.log)
+    
+
 def xtalk_by_gene(df):
     d = df["fun"].div(df.M_GENE,axis=0)
     return d.apply(np.log)
+
 
 def ratio_xtalk_chromatin_tf_by_pair(df):
     tf = df.loc[df["tf_first_layer"] == 1]
@@ -82,6 +92,7 @@ def ratio_xtalk_chromatin_tf_by_pair(df):
                     matched_tf_rows.append(ix_tf)
                     break
     return ratios
+
 
 def ratio_patterning_noncognate_by_pair(df):
     nb = df.loc[df["minimize_noncognate_binding"] == 1]
@@ -115,6 +126,26 @@ def set_default_font_sizes(fontsize):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
+def get_label_from_sublabels(key,sublabs,include_super=False,default_super=[]):
+    if not isinstance(key,tuple):
+        key = tuple([key])
+
+    if not isinstance(sublabs,list):
+        sublabs = [sublabs]
+
+    # construct label
+    lab = []
+    for jj, minikey in enumerate(key):
+        if (len(sublabs) > jj) and sublabs[jj]:
+            lab.append(sublabs[jj][minikey])
+        elif include_super:
+            lab.append(f"{default_super[jj]} = {minikey}")
+        else:
+            lab.append(f"{minikey}")
+    lab = ", ".join(lab)
+
+    return lab
+
 
 def subplots_groupby(df,supercol,filename,title,plotfn,*args,
                      subtitle_include_supercol = True,fontsize=24,
@@ -138,17 +169,12 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
     fig, ax = plt.subplots(subplot_dim[0],subplot_dim[1],figsize=figsize)
     ax = np.array(ax).flatten()
     for ii, key in enumerate(gb.groups.keys()):
+        keytuple = key
+        if not (keytuple is tuple):
+            keytuple = tuple([keytuple])
 
         # construct subtitle
-        subs = []
-        for jj, minikey in enumerate(key):
-            if (len(custom_subtitles) > jj) and custom_subtitles[jj]:
-                subs.append(custom_subtitles[jj][minikey])
-            elif subtitle_include_supercol:
-                subs.append(f"{supercol[jj]} = {minikey}")
-            else:
-                subs.append(f"{minikey}")
-        subtitle = ", ".join(subs)
+        subtitle = get_label_from_sublabels(key,custom_subtitles,subtitle_include_supercol,supercol)
 
         plotfn(gb.get_group(key),*args,ax=ax[ii],title=subtitle,**kwargs)
     fig.suptitle(title,wrap=True)
@@ -157,7 +183,7 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
     plt.close()
 
 
-def boxplot_groupby(df,cols,f,title="",filename="",ax=[]):
+def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[]):
     gb = df.groupby(cols,group_keys=True)
     gb_f = gb.apply(f)
     gb_f = [list(gb_f[key]) for key in gb.groups.keys()]
@@ -166,8 +192,12 @@ def boxplot_groupby(df,cols,f,title="",filename="",ax=[]):
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
 
     bp = ax.boxplot(gb_f,patch_artist=True)
-    ax.set_xlabel(f"{tuple(cols)}")
+
+    if not axlabel:
+        axlabel = f"{tuple(cols)}"
+    ax.set_xlabel(axlabel,wrap=True)
     ax.set_xticklabels(gb.groups.keys(),rotation=45,ha="right")
+    plt.subplots_adjust(bottom=0.15)
 
     def color_patches(f):
         bpcolors = gb.apply(f).to_list()
@@ -235,7 +265,7 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabe
         plt.savefig(filename)
 
 
-def scatter_abs_patterning_error_groupby(df,cols,title="",filename="",ax=(),fontsize=24):
+def scatter_patterning_residuals_groupby(df,cols,title="",filename="",ax=(),fontsize=24):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -304,14 +334,21 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[]):
         layer2_induction_no_xtalk = np.array(list(map(cur_tf_pr_bound,tf_sweep,tf_sweep)))
         ax.plot(layer2_induction_no_xtalk,tf_sweep,color="black",linewidth=2)
 
-    ax.scatter(target_pattern_vals,optimized_input_vals,color="blue",s=5,alpha=0.1)
-    ax.scatter(target_pattern_vals,modulating_concentration_vals,color="green",s=5,alpha=0.1)
+    ax.scatter(target_pattern_vals,optimized_input_vals,color="blue",s=5,alpha=0.1,
+               label="globally optimized concentration")
+    ax.scatter(target_pattern_vals,modulating_concentration_vals,color="green",s=5,alpha=0.1,
+               label="locally optimized concentration")
     ax.set_xlabel("target expression level")
     ax.set_ylabel("concentration")
     ax.set_ylim(0,min(200,max([max(optimized_input_vals),max(modulating_concentration_vals)])))
     
     if not title == "":
         ax.set_title(title,wrap=True)
+
+    lg = ax.legend(loc="upper left",markerscale=10)
+
+    for lgh in lg.legendHandles:
+        lgh.set_alpha(1)
 
     if not filename == "":
         plt.rcParams.update({'font.size':24})

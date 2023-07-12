@@ -32,7 +32,6 @@ def main(argv):
     manage_db.print_res(database,"parameters")
     print("")
 
-    """
     print("NETWORKS")
     manage_db.print_res(database,"networks")
     print("")
@@ -44,7 +43,6 @@ def main(argv):
     print("XTALK")
     manage_db.print_res(database,"xtalk")
     print("")
-    """
 
 
 if __name__ == "__main__":
