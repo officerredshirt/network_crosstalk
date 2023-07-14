@@ -318,6 +318,33 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",ax=(),fontsize=2
         plt.savefig(filename)
 
 
+def scatter_aggregate_error_increase_by_modulating_concentration(df,title="",filename="",ax=[]):
+    if not ax:
+        fig, ax = plt.subplots(figsize=(24,24))
+
+    target_pattern_vals = np.array(df["target_pattern"].to_list()).flatten()
+    #optimized_input_vals = np.array(df[["optimized_input","N_PF"]].apply(lambda x: x["optimized_input"][x["N_PF"]:],axis=1).to_list()).flatten()
+    modulating_concentration_vals = np.array(df["modulating_concentrations"].to_list()).flatten()
+
+    ax.scatter(modulating_concentration_vals,target_pattern_vals,color="green",s=5,alpha=0.1,
+               label="locally optimized concentration")
+    ax.set_xlabel("concentration")
+    ax.set_ylabel("target expression level")
+    ax.set_xlim(0,min(200,max([max(optimized_input_vals),max(modulating_concentration_vals)])))
+    
+    if not title == "":
+        ax.set_title(title,wrap=True)
+
+    lg = ax.legend(loc="upper left",markerscale=10)
+
+    for lgh in lg.legendHandles:
+        lgh.set_alpha(1)
+
+    if not filename == "":
+        plt.rcParams.update({'font.size':24})
+        plt.savefig(filename)
+
+
 def scatter_modulating_concentrations(df,title="",filename="",ax=[]):
     if not ax:
         fig, ax = plt.subplots(figsize=(24,24))
@@ -332,15 +359,15 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[]):
     for cur_tf_pr_bound in tf_pr_bound.values():
         tf_sweep = np.linspace(0,2000,5000)
         layer2_induction_no_xtalk = np.array(list(map(cur_tf_pr_bound,tf_sweep,tf_sweep)))
-        ax.plot(layer2_induction_no_xtalk,tf_sweep,color="black",linewidth=2)
+        ax.plot(tf_sweep,layer2_induction_no_xtalk,color="black",linewidth=2)
 
-    ax.scatter(target_pattern_vals,optimized_input_vals,color="blue",s=5,alpha=0.1,
+    ax.scatter(optimized_input_vals,target_pattern_vals,color="blue",s=5,alpha=0.1,
                label="globally optimized concentration")
-    ax.scatter(target_pattern_vals,modulating_concentration_vals,color="green",s=5,alpha=0.1,
+    ax.scatter(modulating_concentration_vals,target_pattern_vals,color="green",s=5,alpha=0.1,
                label="locally optimized concentration")
-    ax.set_xlabel("target expression level")
-    ax.set_ylabel("concentration")
-    ax.set_ylim(0,min(200,max([max(optimized_input_vals),max(modulating_concentration_vals)])))
+    ax.set_xlabel("concentration")
+    ax.set_ylabel("target expression level")
+    ax.set_xlim(0,min(200,max([max(optimized_input_vals),max(modulating_concentration_vals)])))
     
     if not title == "":
         ax.set_title(title,wrap=True)
@@ -396,6 +423,8 @@ def calc_modulating_concentrations(df):
     kpr_pr_open = dill_load_as_dict(df,"kpr_pr_open.out")
     tf_pr_bound = dill_load_as_dict(df,"tf_pr_bound.out")
 
+    # TODO: calculate expression error post-modulation
+
     def calc_one_row(row):
         if np.isnan(row["modulating_concentrations"]).any():
             db_folder = os.path.dirname(row.filename)
@@ -418,6 +447,7 @@ def calc_modulating_concentrations(df):
 
                 modulating_concentrations[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(tf_pr_bound[db_folder],cur_noncognate_concentrations,x,target_corrected_for_layer1[ii_gene]),tf_concentrations[ii_gene])
             row["modulating_concentrations"] = np.array(modulating_concentrations)
+            #row["error_post_modulation"] = 
         return row
 
     return df.apply(calc_one_row,axis=1)

@@ -724,3 +724,97 @@ def append_db(db_parent_filename,db_filename):
 
 
     return 0
+
+
+def get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder):
+    assert N_PF > 0, "get_crosstalk_metric does not support N_PF = 0"
+    # pr_tf_bound is imported with tf_binding_equilibrium
+    if tf_first_layer:
+        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_pr_bound.out"),"rb"))
+        pr_chromatin_error = dill.load(open(os.path.join(model_folder,"tf_chrom_equiv_error_rate.out"),"rb"))
+    else:
+        pr_chromatin_open = dill.load(open(os.path.join(model_folder,"kpr_pr_open.out"), "rb"))
+        pr_chromatin_error = dill.load(open(os.path.join(model_folder,"kpr_opening_error_rate.out"),"rb"))
+
+    pr_tf_bound = dill.load(open(os.path.join(model_folder,"tf_pr_bound.out"),"rb"))
+    pr_tf_error = dill.load(open(os.path.join(model_folder,"tf_error_rate.out"),"rb"))
+
+    max_concentration = 1e20
+    max_expression = pr_chromatin_open(max_concentration,max_concentration)*pr_tf_bound(max_concentration,max_concentration)
+
+    R_bool = (R != 0)
+    T_bool = (T != 0)
+
+    def crosstalk_metric(x,c_PF,c_TF,return_var="metric"):
+        #if N_PF == 0:   # network is layer 2 TFs only
+            #def get_gene_exp(c_PF,c_TF):
+                #C_TF = sum(c_TF)
+#
+                #pr_wrapper = lambda t: pr_tf_bound(C_TF,c_TF[t])
+#
+                #return list(map(pr_wrapper,T_bool))
+
+        def get_gene_exp(c_PF,c_TF):
+            C_PF = sum(c_PF)
+            C_TF = sum(c_TF)
+            
+            if crosslayer_crosstalk:
+                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])*pr_tf_bound(C_TF+C_PF,c_TF[t])
+            else:
+                pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_tf_bound(C_TF,c_TF[t])
+        
+            return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
+
+        def get_error_frac(c_PF,c_TF):
+            C_PF = sum(c_PF)
+            C_TF = sum(c_TF)
+
+            if crosslayer_crosstalk:
+                E1 = lambda r: pr_chromatin_error(C_PF+C_TF,c_PF[r])
+                E2 = lambda t: pr_tf_error(C_TF+C_PF,c_TF[t])
+            else:
+                E1 = lambda r: pr_chromatin_error(C_PF,c_PF[r])
+                E2 = lambda t: pr_tf_error(C_TF,c_TF[t])
+
+            chromatin_error = np.concatenate(list(map(E1,R_bool)))
+            tf_error = np.concatenate(list(map(E2,T_bool)))
+            total_error = chromatin_error + tf_error - chromatin_error*tf_error
+            
+            return np.column_stack((chromatin_error,tf_error,total_error))
+
+        if return_var == "gene_exp":
+            return get_gene_exp(c_PF,c_TF)
+        elif return_var == "error_frac":
+            return get_error_frac(c_PF,c_TF)
+        elif return_var == "max_expression":
+            return max_expression
+        elif return_var == "metric":
+            if minimize_noncognate_binding:
+                gene_exp = get_gene_exp(c_PF,c_TF)
+                err_frac = get_error_frac(c_PF,c_TF)[:,2]
+                d1 = x - gene_exp*(1-err_frac)
+                d2 = gene_exp*err_frac
+                return np.transpose(d1)@d1 + np.transpose(d2)@d2
+            else:
+                d = x - get_gene_exp(c_PF,c_TF)
+                return np.transpose(d)@d
+        else:
+            print(f"unrecognized return variable option {return_var}")
+            return
+
+    return crosstalk_metric
+
+
+def get_crosstalk_metric_from_row(row):
+    return get_crosstalk_metric(row["R"],row["T"],row["G"],row["N_PF"],row["N_TF"], \
+            row["crosslayer_crosstalk"],row["tf_first_layer"],row["minimize_noncognate_binding"], \
+            row["filename"].apply(os.path.dirname))
+
+
+def get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder):
+    local_id = extract_local_id(filename_in)
+
+    # load architecture
+    R, T, G = get_network(database,local_id)
+
+    return get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder)
