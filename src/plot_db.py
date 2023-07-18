@@ -10,6 +10,9 @@ import dill
 import itertools
 import manage_db
 import pandas as pd
+from pandarallel import pandarallel
+
+pandarallel.initialize()
 
 # Merges dictionaries with shared keys into single dictionary with same
 # keys and values as list of values across all merged dictionaries.
@@ -44,6 +47,10 @@ def convert_to_dataframe(db_filename):
     df = df.join(df_filename)
     df["modulating_concentrations"] = np.nan
     df["modulating_concentrations"] = df["modulating_concentrations"].astype(object)
+    df["error_metric_post_modulation"] = np.nan
+    df["error_metric_post_modulation"] = df["error_metric_post_modulation"].astype(object)
+    if "ratio_KNS_KS" not in df.columns:
+        df["ratio_KNS_KS"] = df["K_NS"]/df["K_S"]
     return df
 
 
@@ -318,27 +325,64 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",ax=(),fontsize=2
         plt.savefig(filename)
 
 
-def scatter_aggregate_error_increase_by_modulating_concentration(df,title="",filename="",ax=[]):
+def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",filename="",ax=(),leglabel=[],fontsize=24):
+    gb = df.groupby(cols,group_keys = True)
+
+    tf_error_rate = dill_load_as_dict(df,"tf_error_rate.out")
+
+    def second_layer_error(row):
+        filename = os.path.dirname(row["filename"])
+        layer2_opt_conc = row["optimized_input"][row["N_PF"]:]
+        C = np.sum(layer2_opt_conc)
+        cum_err = np.zeros(len(row["modulating_concentrations"]))
+        opt_cum_err = np.sum(list(map(lambda x: tf_error_rate[filename](C,x),layer2_opt_conc)))
+        for ii, modconc in enumerate(row["modulating_concentrations"]):
+            cur_conc = layer2_opt_conc.copy()
+            cur_conc[ii] = modconc
+            cum_err[ii] = np.sum(list(map(lambda x: tf_error_rate[filename](C - layer2_opt_conc[ii] + \
+                    modconc, x), cur_conc)))
+        return cum_err - opt_cum_err
+
     if not ax:
-        fig, ax = plt.subplots(figsize=(24,24))
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
 
-    target_pattern_vals = np.array(df["target_pattern"].to_list()).flatten()
-    #optimized_input_vals = np.array(df[["optimized_input","N_PF"]].apply(lambda x: x["optimized_input"][x["N_PF"]:],axis=1).to_list()).flatten()
-    modulating_concentration_vals = np.array(df["modulating_concentrations"].to_list()).flatten()
+    def scatter_one(gr):
+        modulating_concentration_vals = np.array(gr["modulating_concentrations"].to_list()).flatten()
+        optimized_input_vals = np.array(gr[["optimized_input","N_PF"]].apply(lambda x: x["optimized_input"][x["N_PF"]:],axis=1).to_list()).flatten()
+        concentration_change = modulating_concentration_vals - optimized_input_vals
+        error_increase = np.log(np.array(gr[["fun","error_metric_post_modulation"]].parallel_apply( \
+                lambda x: x["error_metric_post_modulation"] - x["fun"],axis=1).to_list()).flatten())
+        #error_rates = gr[["filename","optimized_input", \
+                #"N_PF","modulating_concentrations"]].parallel_apply(second_layer_error,axis=1)
+        #error_rates = np.array(error_rates.to_list()).flatten()
 
-    ax.scatter(modulating_concentration_vals,target_pattern_vals,color="green",s=5,alpha=0.1,
-               label="locally optimized concentration")
-    ax.set_xlabel("concentration")
-    ax.set_ylabel("target expression level")
-    ax.set_xlim(0,min(200,max([max(optimized_input_vals),max(modulating_concentration_vals)])))
+        if not leglabel:
+            labtext = f"{cols} = {gr.name}"
+        else:
+            labtext = leglabel[gr.name]
+
+        ax.plot(concentration_change,error_increase,'o',ms=5,alpha=0.2,label=labtext)
+        #ax.plot(concentration_change,error_rates,'o',ms=5,alpha=0.2,label=labtext)
+        #ax.plot(modulating_concentration_vals,error_rates,'o',ms=5,alpha=0.2,label=labtext)
+
+    gb.apply(scatter_one)
+
+    ax.set_xlabel("change in concentration")
+    #ax.set_xlabel("modulating concentration")
+    ax.set_xlim(0,min(200,ax.get_xlim()[1]))
+
+    ax.set_ylabel("log increase in error")
+    #ax.set_ylabel("change in layer 2 cumulative error rate")
+    #ax.set_ylim(-0.2,0.2)
+
+    lg = ax.legend(loc="lower right",markerscale=10)
+
+    for lgh in lg.get_lines():
+        lgh.set_alpha(1)
+        lgh.set_marker('.')
     
     if not title == "":
         ax.set_title(title,wrap=True)
-
-    lg = ax.legend(loc="upper left",markerscale=10)
-
-    for lgh in lg.legendHandles:
-        lgh.set_alpha(1)
 
     if not filename == "":
         plt.rcParams.update({'font.size':24})
@@ -423,13 +467,15 @@ def calc_modulating_concentrations(df):
     kpr_pr_open = dill_load_as_dict(df,"kpr_pr_open.out")
     tf_pr_bound = dill_load_as_dict(df,"tf_pr_bound.out")
 
-    # TODO: calculate expression error post-modulation
-
     def calc_one_row(row):
         if np.isnan(row["modulating_concentrations"]).any():
             db_folder = os.path.dirname(row.filename)
+            print(f"Calculating modulating concentrations for {row.filename}...")
+
+            crosstalk_metric = manage_db.get_crosstalk_metric_from_row(row)
 
             modulating_concentrations = np.zeros(len(row["target_pattern"]))
+            error_metric_post_modulation = np.zeros(len(row["target_pattern"]))
             layer1_concentrations = row["optimized_input"][:row["N_PF"]]
             tf_concentrations = row["optimized_input"][row["N_PF"]:]
             for ii_gene, target_level in enumerate(row["target_pattern"]):
@@ -446,8 +492,15 @@ def calc_modulating_concentrations(df):
                 target_corrected_for_layer1 = np.divide(row["target_pattern"],layer1_probabilities)
 
                 modulating_concentrations[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(tf_pr_bound[db_folder],cur_noncognate_concentrations,x,target_corrected_for_layer1[ii_gene]),tf_concentrations[ii_gene])
+
+                tf_concentrations_with_ii_modulated = tf_concentrations.copy()
+                tf_concentrations_with_ii_modulated[ii_gene] = modulating_concentrations[ii_gene]
+                error_metric_post_modulation[ii_gene] = crosstalk_metric(row["target_pattern"], \
+                        layer1_concentrations,tf_concentrations_with_ii_modulated)
+
             row["modulating_concentrations"] = np.array(modulating_concentrations)
-            #row["error_post_modulation"] = 
+            row["error_metric_post_modulation"] = np.array(error_metric_post_modulation)
         return row
 
-    return df.apply(calc_one_row,axis=1)
+
+    return df.parallel_apply(calc_one_row,axis=1)

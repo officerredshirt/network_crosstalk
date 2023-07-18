@@ -726,7 +726,8 @@ def append_db(db_parent_filename,db_filename):
     return 0
 
 
-def get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder):
+def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
+        crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder):
     assert N_PF > 0, "get_crosstalk_metric does not support N_PF = 0"
     # pr_tf_bound is imported with tf_binding_equilibrium
     if tf_first_layer:
@@ -746,14 +747,6 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,min
     T_bool = (T != 0)
 
     def crosstalk_metric(x,c_PF,c_TF,return_var="metric"):
-        #if N_PF == 0:   # network is layer 2 TFs only
-            #def get_gene_exp(c_PF,c_TF):
-                #C_TF = sum(c_TF)
-#
-                #pr_wrapper = lambda t: pr_tf_bound(C_TF,c_TF[t])
-#
-                #return list(map(pr_wrapper,T_bool))
-
         def get_gene_exp(c_PF,c_TF):
             C_PF = sum(c_PF)
             C_TF = sum(c_TF)
@@ -808,7 +801,7 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,min
 def get_crosstalk_metric_from_row(row):
     return get_crosstalk_metric(row["R"],row["T"],row["G"],row["N_PF"],row["N_TF"], \
             row["crosslayer_crosstalk"],row["tf_first_layer"],row["minimize_noncognate_binding"], \
-            row["filename"].apply(os.path.dirname))
+            os.path.dirname(row["filename"]))
 
 
 def get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder):
