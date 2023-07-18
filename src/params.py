@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # ARCHITECTURE
-N_PF = 5               # number pioneer factors
+N_PF = 5                # number pioneer factors
 N_CLUSTERS = N_PF       # number clusters
 GENES_PER_CLUSTER = 5   # number genes per cluster
 M_GENE = GENES_PER_CLUSTER*N_CLUSTERS   # number genes
@@ -27,8 +27,8 @@ k_neq = 0.05    # s-1
 # LAYER 2 EQUILIBRIUM TF
 THETA = 1     # number TFs per enhancer (layer 2)
 n = 1         # number binding sites per TF (layer 2)
-K_S = kh_Sm/kh_Sp  # TF binding dissociation rate (specific), s-1
-K_NS = 100      # TF binding dissociation rate (nonspecific), s-1
+K_S = kh_Sm/kh_Sp       # TF binding dissociation rate (specific), s-1
+K_NS = ratio_KNS_KS*K_S # TF binding dissociation rate (nonspecific), s-1
 
 # TARGET PATTERNS
 NUM_TARGETS = 10        # number random target patterns to generate
