@@ -14,6 +14,37 @@ from pandarallel import pandarallel
 
 pandarallel.initialize()
 
+
+def get_varname_to_value_dict(df):
+    varname_dict = {"ratio_KNS_KS":"$K_{NS}/K_S$",
+                    "K_NS":"$K_{NS}$",
+                    "K_S":"$K_S$",
+                    "M_GENE":"number of genes",
+                    "MAX_CLUSTERS_ACTIVE":"number of active clusters"}
+    
+    varname_to_value = {}
+    for var in varname_dict.keys():
+        possible_values = set(df[var])
+        key_val_pairs = list(zip(itertools.repeat(var),possible_values))
+        labels_per_key = [f"{varname_dict[x[0]]} = {x[1]}" for x in key_val_pairs]
+        varname_to_value = varname_to_value | dict(zip(key_val_pairs,labels_per_key))
+
+    boolean_vars = {("minimize_noncognate_binding",0):"global expression error",
+                    ("minimize_noncognate_binding",1):"noncognate binding error",
+                    ("tf_first_layer",0):"chromatin",
+                    ("tf_first_layer",1):"free DNA",
+                    "tf_first_layer":"TF first layer"}
+
+    varname_to_value = varname_to_value | boolean_vars
+
+    return varname_to_value
+
+def to_tuple(x):
+    if not type(x) == tuple:
+        return tuple([x])
+    return x
+
+
 # Merges dictionaries with shared keys into single dictionary with same
 # keys and values as list of values across all merged dictionaries.
 # Helper function for "convert_to_dataframe"
@@ -232,18 +263,18 @@ def set_default_font_sizes(fontsize):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def get_label_from_sublabels(key,sublabs,include_super=False,default_super=[]):
+def get_label_from_sublabels(key,varnames_dict=[],include_super=False,default_super=[]):
     if not isinstance(key,tuple):
         key = tuple([key])
-
-    if not isinstance(sublabs,list):
-        sublabs = [sublabs]
 
     # construct label
     lab = []
     for jj, minikey in enumerate(key):
-        if (len(sublabs) > jj) and sublabs[jj]:
-            lab.append(sublabs[jj][minikey])
+        if varnames_dict:
+            print(key)
+            print(minikey)
+            sys.exit()
+            lab.append(varnames_dict[(key,minikey)])
         elif include_super:
             lab.append(f"{default_super[jj]} = {minikey}")
         else:
@@ -253,10 +284,21 @@ def get_label_from_sublabels(key,sublabs,include_super=False,default_super=[]):
     return lab
 
 
+def get_label(varnames,vals,varnames_dict):
+    if varnames_dict:
+        keys = list(zip(varnames,vals))
+        lab = []
+        for key in keys:
+            lab.append(varnames_dict[key])
+        lab = ", ".join(lab)
+    else:
+        lab = f"{varnames} = {vals}"
+    return lab
+
+
 def subplots_groupby(df,supercol,filename,title,plotfn,*args,
                      subtitle_include_supercol = True,fontsize=24,
-                     custom_subtitles = [],supercol_labels=[],
-                     figsize = [],subplot_dim = [],**kwargs):
+                     varnames_dict=[],figsize = [],subplot_dim = [],**kwargs):
     if type(supercol) == str:
         supercol = [supercol]
     gb = df.groupby(supercol,group_keys=True)
@@ -275,28 +317,17 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
     fig, ax = plt.subplots(subplot_dim[0],subplot_dim[1],figsize=figsize)
     ax = np.array(ax).flatten()
     for ii, key in enumerate(gb.groups.keys()):
-        keytuple = key
-        if not (keytuple is tuple):
-            keytuple = tuple([keytuple])
+        subtitle = get_label(supercol,to_tuple(key),varnames_dict)
 
+        plotfn(gb.get_group(key),*args,varnames_dict=varnames_dict,ax=ax[ii],title=subtitle,**kwargs)
 
-        if not supercol_labels:
-            supercol_label_list = supercol
-        else:
-            supercol_label_list = [supercol_labels[x] for x in supercol]
-
-        # construct subtitle
-        subtitle = get_label_from_sublabels(key,custom_subtitles,subtitle_include_supercol,
-                                            supercol_label_list)
-
-        plotfn(gb.get_group(key),*args,ax=ax[ii],title=subtitle,**kwargs)
     fig.suptitle(title,wrap=True)
 
     plt.savefig(filename)
     plt.close()
 
 
-def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[],axticks=[]):
+def boxplot_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],axlabel=" "):
     gb = df.groupby(cols,group_keys=True)
     gb_f = gb.apply(f)
     gb_f = [list(gb_f[key]) for key in gb.groups.keys()]
@@ -309,11 +340,12 @@ def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[],axticks=[]):
     if not axlabel:
         axlabel = f"{tuple(cols)}"
     ax.set_xlabel(axlabel,wrap=True)
-    if not axticks:
-        ax.set_xticklabels(gb.groups.keys(),rotation=45,ha="right")
-    else:
-        axticklabs = list(map(lambda x: axticks[x],gb.groups.keys()))
-        ax.set_xticklabels(axticklabs,rotation=45,ha="right")
+
+    axticklabs = [None]*len(gb.groups.keys())
+    for ii, key in enumerate(gb.groups.keys()):
+        axticklabs[ii] = get_label(cols,to_tuple(key),varnames_dict)
+    ax.set_xticklabels(axticklabs,rotation=45,ha="right")
+
     plt.subplots_adjust(bottom=0.15)
 
     def color_patches(f):
@@ -347,7 +379,7 @@ def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[],axticks=[]):
         plt.savefig(filename)
         
 
-def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabel=[],leglabel_vars=[]):
+def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[]):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -358,14 +390,7 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabe
         actual_expression = np.array(gr["output_expression"].to_list()).flatten()
 
         ax.plot([0,1],[0,1],color="gray",linewidth=1)
-        if leglabel:
-            labtext = leglabel[gr.name]
-        elif leglabel_vars:
-            default_super = [leglabel_vars[x] for x in cols]
-            labtext = get_label_from_sublabels(key=gr.name,sublabs=[],
-                                               include_super=True,default_super=default_super)
-        else:
-            labtext = f"{cols} = {gr.name}"
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
         ax.plot(target_pattern_vals,actual_expression,'o',ms=5,alpha=0.2,label=labtext)
 
@@ -386,7 +411,7 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabe
         plt.savefig(filename)
 
 
-def scatter_patterning_residuals_groupby(df,cols,title="",filename="",ax=(),fontsize=24):
+def scatter_patterning_residuals_groupby(df,cols,title="",filename="",ax=(),fontsize=24,varnames_dict=[]):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -396,9 +421,11 @@ def scatter_patterning_residuals_groupby(df,cols,title="",filename="",ax=(),font
         target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
         actual_expression = np.array(gr["output_expression"].to_list()).flatten()
 
-        ax.scatter(target_pattern_vals,actual_expression - target_pattern_vals,s=5,alpha=0.2,label=f"{cols} = {gr.name}")
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
+
+        ax.scatter(target_pattern_vals,actual_expression - target_pattern_vals,s=5,alpha=0.2,label=labtext)
         plt.rcParams.update({'font.size':fontsize})
-        plt.rc("legend",fontsize=np.round(fontsize*0.75))
+        plt.rc("legend",fontsize=fontsize)
 
     gb.apply(scatter_one)
 
@@ -439,7 +466,8 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",ax=(),fontsize=2
         plt.savefig(filename)
 
 
-def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",filename="",ax=(),leglabel=[],fontsize=24,layer2=False):
+def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",filename="",ax=(),
+                                                               varnames_dict=[],fontsize=24,layer2=False):
     gb = df.groupby(cols,group_keys = True)
 
     tf_error_rate = dill_load_as_dict(df,"tf_error_rate.out")
@@ -472,10 +500,7 @@ def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",
                     "N_PF","modulating_concentrations"]].parallel_apply(second_layer_error,axis=1)
             error_increase = np.log(np.array(error_increase.to_list()).flatten())
 
-        if not leglabel:
-            labtext = f"{cols} = {gr.name}"
-        else:
-            labtext = leglabel[gr.name]
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
         ax.plot(concentration_change,error_increase,'o',ms=5,alpha=0.2,label=labtext)
         #ax.plot(modulating_concentration_vals,error_increase,'o',ms=5,alpha=0.2,label=labtext)
