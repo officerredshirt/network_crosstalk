@@ -85,6 +85,90 @@ def xtalk_by_gene(df):
     return d.apply(np.log)
 
 
+def rms_xtalk(df):
+    d = df["fun"].div(df.M_GENE,axis=0)
+    return d.apply(np.sqrt)
+
+
+def cumulative_expression_err_from_high_genes(df,thresh):
+    def per_row(row):
+        on_ix = row["target_pattern"] > thresh
+
+        on_target = np.array(manage_db.logical_ix(row["target_pattern"],on_ix))
+
+        on_expression = np.array(manage_db.logical_ix(row["output_expression"],on_ix))
+        
+        on_err = on_expression - on_target
+        on_err = on_err@on_err
+    
+        return np.log(on_err)
+    return df.parallel_apply(per_row,axis=1)
+
+
+def cumulative_expression_err_from_OFF_genes(df):
+    def per_row(row):
+        off_ix = row["target_pattern"] == 0
+
+        off_target = np.array(manage_db.logical_ix(row["target_pattern"],off_ix))
+
+        off_expression = np.array(manage_db.logical_ix(row["output_expression"],off_ix))
+        
+        off_err = off_expression - off_target
+        off_err = off_err@off_err
+    
+        return np.log(off_err)
+    return df.parallel_apply(per_row,axis=1)
+
+
+def percent_expression_err_from_ON_vs_OFF_genes(df):
+    def per_row(row):
+        on_ix = row["target_pattern"] > 0
+        off_ix = row["target_pattern"] == 0
+
+        on_target = np.array(manage_db.logical_ix(row["target_pattern"],on_ix))
+        off_target = np.array(manage_db.logical_ix(row["target_pattern"],off_ix))
+
+        on_expression = np.array(manage_db.logical_ix(row["output_expression"],on_ix))
+        off_expression = np.array(manage_db.logical_ix(row["output_expression"],off_ix))
+
+        on_err = on_expression - on_target
+        on_err = on_err@on_err
+        
+        off_err = off_expression - off_target
+        off_err = off_err@off_err
+    
+        return (off_err)/(on_err+off_err)
+    return df.parallel_apply(per_row,axis=1)
+
+
+def effective_dynamic_range_per_row(row):
+        on_ix = row["target_pattern"] > 0
+        on_expression = np.array(manage_db.logical_ix(row["output_expression"],on_ix))
+        return max(on_expression) - min(on_expression)
+
+def effective_dynamic_range(df):
+    # TAKE 1: defined as max(ON expression) - min(ON expression)
+    return df.parallel_apply(effective_dynamic_range_per_row,axis=1)
+
+
+def ratio_effective_dynamic_range_by_pair(df):
+    tf = df.loc[df["tf_first_layer"] == 1]
+    pf = df.loc[df["tf_first_layer"] == 0]
+
+    ratios = []
+    matched_tf_rows = []
+    for ix_pf, row_pf in pf.iterrows():
+        for ix_tf, row_tf in tf.iterrows():
+            if not ix_tf in matched_tf_rows:
+                if np.array_equal(row_pf["target_pattern"],row_tf["target_pattern"]):
+                    pf_dr = effective_dynamic_range_per_row(row_pf)
+                    tf_dr = effective_dynamic_range_per_row(row_tf)
+                    ratios.append(pf_dr/tf_dr)
+                    matched_tf_rows.append(ix_tf)
+                    break
+    return ratios
+
+
 def ratio_xtalk_chromatin_tf_by_pair(df):
     tf = df.loc[df["tf_first_layer"] == 1]
     pf = df.loc[df["tf_first_layer"] == 0]
@@ -96,6 +180,22 @@ def ratio_xtalk_chromatin_tf_by_pair(df):
             if not ix_tf in matched_tf_rows:
                 if np.array_equal(row_pf["target_pattern"],row_tf["target_pattern"]):
                     ratios.append(np.log(row_pf["fun"] / row_tf["fun"]))
+                    matched_tf_rows.append(ix_tf)
+                    break
+    return ratios
+
+
+def ratio_rms_xtalk_chromatin_tf_by_pair(df):
+    tf = df.loc[df["tf_first_layer"] == 1]
+    pf = df.loc[df["tf_first_layer"] == 0]
+
+    ratios = []
+    matched_tf_rows = []
+    for ix_pf, row_pf in pf.iterrows():
+        for ix_tf, row_tf in tf.iterrows():
+            if not ix_tf in matched_tf_rows:
+                if row_pf[["filename","target_pattern"]].equals(row_tf[["filename","target_pattern"]]):
+                    ratios.append(0.5*np.log(row_pf["fun"] / row_tf["fun"])) #0.5 bc RMS
                     matched_tf_rows.append(ix_tf)
                     break
     return ratios
@@ -119,7 +219,6 @@ def ratio_patterning_noncognate_by_pair(df):
 
 
 def set_default_font_sizes(fontsize):
-
     SMALL_SIZE = round(fontsize*0.8)
     MEDIUM_SIZE = fontsize
     BIGGER_SIZE = round(fontsize*1.2) 
@@ -156,7 +255,7 @@ def get_label_from_sublabels(key,sublabs,include_super=False,default_super=[]):
 
 def subplots_groupby(df,supercol,filename,title,plotfn,*args,
                      subtitle_include_supercol = True,fontsize=24,
-                     custom_subtitles = [],
+                     custom_subtitles = [],supercol_labels=[],
                      figsize = [],subplot_dim = [],**kwargs):
     if type(supercol) == str:
         supercol = [supercol]
@@ -180,8 +279,15 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
         if not (keytuple is tuple):
             keytuple = tuple([keytuple])
 
+
+        if not supercol_labels:
+            supercol_label_list = supercol
+        else:
+            supercol_label_list = [supercol_labels[x] for x in supercol]
+
         # construct subtitle
-        subtitle = get_label_from_sublabels(key,custom_subtitles,subtitle_include_supercol,supercol)
+        subtitle = get_label_from_sublabels(key,custom_subtitles,subtitle_include_supercol,
+                                            supercol_label_list)
 
         plotfn(gb.get_group(key),*args,ax=ax[ii],title=subtitle,**kwargs)
     fig.suptitle(title,wrap=True)
@@ -190,7 +296,7 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
     plt.close()
 
 
-def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[]):
+def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[],axticks=[]):
     gb = df.groupby(cols,group_keys=True)
     gb_f = gb.apply(f)
     gb_f = [list(gb_f[key]) for key in gb.groups.keys()]
@@ -203,7 +309,11 @@ def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[]):
     if not axlabel:
         axlabel = f"{tuple(cols)}"
     ax.set_xlabel(axlabel,wrap=True)
-    ax.set_xticklabels(gb.groups.keys(),rotation=45,ha="right")
+    if not axticks:
+        ax.set_xticklabels(gb.groups.keys(),rotation=45,ha="right")
+    else:
+        axticklabs = list(map(lambda x: axticks[x],gb.groups.keys()))
+        ax.set_xticklabels(axticklabs,rotation=45,ha="right")
     plt.subplots_adjust(bottom=0.15)
 
     def color_patches(f):
@@ -237,7 +347,7 @@ def boxplot_groupby(df,cols,f,title="",filename="",ax=[],axlabel=[]):
         plt.savefig(filename)
         
 
-def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabel=[]):
+def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabel=[],leglabel_vars=[]):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -248,10 +358,14 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",ax=[],leglabe
         actual_expression = np.array(gr["output_expression"].to_list()).flatten()
 
         ax.plot([0,1],[0,1],color="gray",linewidth=1)
-        if not leglabel:
-            labtext = f"{cols} = {gr.name}"
-        else:
+        if leglabel:
             labtext = leglabel[gr.name]
+        elif leglabel_vars:
+            default_super = [leglabel_vars[x] for x in cols]
+            labtext = get_label_from_sublabels(key=gr.name,sublabs=[],
+                                               include_super=True,default_super=default_super)
+        else:
+            labtext = f"{cols} = {gr.name}"
 
         ax.plot(target_pattern_vals,actual_expression,'o',ms=5,alpha=0.2,label=labtext)
 
@@ -325,7 +439,7 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",ax=(),fontsize=2
         plt.savefig(filename)
 
 
-def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",filename="",ax=(),leglabel=[],fontsize=24):
+def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",filename="",ax=(),leglabel=[],fontsize=24,layer2=False):
     gb = df.groupby(cols,group_keys = True)
 
     tf_error_rate = dill_load_as_dict(df,"tf_error_rate.out")
@@ -341,7 +455,7 @@ def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",
             cur_conc[ii] = modconc
             cum_err[ii] = np.sum(list(map(lambda x: tf_error_rate[filename](C - layer2_opt_conc[ii] + \
                     modconc, x), cur_conc)))
-        return cum_err - opt_cum_err
+        return np.log(cum_err/opt_cum_err)
 
     if not ax:
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
@@ -349,12 +463,14 @@ def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",
     def scatter_one(gr):
         modulating_concentration_vals = np.array(gr["modulating_concentrations"].to_list()).flatten()
         optimized_input_vals = np.array(gr[["optimized_input","N_PF"]].apply(lambda x: x["optimized_input"][x["N_PF"]:],axis=1).to_list()).flatten()
-        concentration_change = modulating_concentration_vals - optimized_input_vals
-        error_increase = np.log(np.array(gr[["fun","error_metric_post_modulation"]].parallel_apply( \
-                lambda x: x["error_metric_post_modulation"] - x["fun"],axis=1).to_list()).flatten())
-        #error_rates = gr[["filename","optimized_input", \
-                #"N_PF","modulating_concentrations"]].parallel_apply(second_layer_error,axis=1)
-        #error_rates = np.array(error_rates.to_list()).flatten()
+        concentration_change = np.divide(modulating_concentration_vals,optimized_input_vals)
+        if not layer2:
+            error_increase = np.log(np.array(gr[["fun","error_metric_post_modulation"]].parallel_apply( \
+                    lambda x: x["error_metric_post_modulation"]-x["fun"],axis=1).to_list()).flatten())
+        else:
+            error_increase = gr[["filename","optimized_input", \
+                    "N_PF","modulating_concentrations"]].parallel_apply(second_layer_error,axis=1)
+            error_increase = np.log(np.array(error_increase.to_list()).flatten())
 
         if not leglabel:
             labtext = f"{cols} = {gr.name}"
@@ -362,17 +478,21 @@ def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",
             labtext = leglabel[gr.name]
 
         ax.plot(concentration_change,error_increase,'o',ms=5,alpha=0.2,label=labtext)
-        #ax.plot(concentration_change,error_rates,'o',ms=5,alpha=0.2,label=labtext)
+        #ax.plot(modulating_concentration_vals,error_increase,'o',ms=5,alpha=0.2,label=labtext)
         #ax.plot(modulating_concentration_vals,error_rates,'o',ms=5,alpha=0.2,label=labtext)
 
     gb.apply(scatter_one)
 
-    ax.set_xlabel("change in concentration")
+    ax.set_xlabel("relative modulating concentration")
     #ax.set_xlabel("modulating concentration")
-    ax.set_xlim(0,min(200,ax.get_xlim()[1]))
+    #ax.set_xlim(0,min(200,ax.get_xlim()[1]))
+    ax.set_xlim(1,min(1.5,ax.get_xlim()[1]))
 
-    ax.set_ylabel("log increase in error")
-    #ax.set_ylabel("change in layer 2 cumulative error rate")
+    if not layer2:
+        ax.set_ylabel("log change in total error")
+    else:
+        ax.set_ylabel("log change in layer 2 cumulative error rate")
+    #ax.set_ylim(-20,0)
     #ax.set_ylim(-0.2,0.2)
 
     lg = ax.legend(loc="lower right",markerscale=10)
@@ -467,10 +587,11 @@ def calc_modulating_concentrations(df):
     kpr_pr_open = dill_load_as_dict(df,"kpr_pr_open.out")
     tf_pr_bound = dill_load_as_dict(df,"tf_pr_bound.out")
 
+    print("Calculating modulating concentrations...")
     def calc_one_row(row):
         if np.isnan(row["modulating_concentrations"]).any():
             db_folder = os.path.dirname(row.filename)
-            print(f"Calculating modulating concentrations for {row.filename}...")
+            print(".",end="",flush=True)
 
             crosstalk_metric = manage_db.get_crosstalk_metric_from_row(row)
 
