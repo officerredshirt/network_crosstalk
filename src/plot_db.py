@@ -263,27 +263,6 @@ def set_default_font_sizes(fontsize):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def get_label_from_sublabels(key,varnames_dict=[],include_super=False,default_super=[]):
-    if not isinstance(key,tuple):
-        key = tuple([key])
-
-    # construct label
-    lab = []
-    for jj, minikey in enumerate(key):
-        if varnames_dict:
-            print(key)
-            print(minikey)
-            sys.exit()
-            lab.append(varnames_dict[(key,minikey)])
-        elif include_super:
-            lab.append(f"{default_super[jj]} = {minikey}")
-        else:
-            lab.append(f"{minikey}")
-    lab = ", ".join(lab)
-
-    return lab
-
-
 def get_label(varnames,vals,varnames_dict):
     if varnames_dict:
         keys = list(zip(varnames,vals))
@@ -337,14 +316,27 @@ def boxplot_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],axlabe
 
     bp = ax.boxplot(gb_f,patch_artist=True)
 
-    if not axlabel:
-        axlabel = f"{tuple(cols)}"
-    ax.set_xlabel(axlabel,wrap=True)
-
     axticklabs = [None]*len(gb.groups.keys())
     for ii, key in enumerate(gb.groups.keys()):
         axticklabs[ii] = get_label(cols,to_tuple(key),varnames_dict)
+
+    try:
+        ix = axticklabs[0].index("=")
+        ticklab_prefixes = [x[0:ix] for x in axticklabs]
+        
+        if len(set(ticklab_prefixes)) == 1:
+            if not axlabel:
+                axlabel = ticklab_prefixes[0][:-1]
+                axticklabs = [x[ix+2:] for x in axticklabs]
+    except:
+        pass
+
     ax.set_xticklabels(axticklabs,rotation=45,ha="right")
+
+    if not axlabel:
+        axlabel = f"{tuple(cols)}"
+    ax.set_xlabel(axlabel,wrap=True)
+    
 
     plt.subplots_adjust(bottom=0.15)
 
@@ -378,6 +370,84 @@ def boxplot_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],axlabe
         plt.rcParams.update({'font.size':24})
         plt.savefig(filename)
         
+
+def bar_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[]):
+    if len(cols) == 1:
+        gb_cols = cols[0]
+    else:
+        gb_cols = cols
+    gb = df.groupby(gb_cols,group_keys=True)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    layer1_error_frac = np.zeros(len(gb.groups.keys()))
+    layer2_error_frac = np.zeros(len(gb.groups.keys()))
+    total_error_frac = np.zeros(len(gb.groups.keys()))
+    labtext = []
+    for ii, (name,gr) in enumerate(gb):
+        cur_on_ix = np.array(gr["target_pattern"].to_list()).flatten() > 0
+        cur_error_frac = gr["output_error"].to_list()
+        cur_layer1_error_frac = np.array([x[:,0] for x in cur_error_frac]).flatten()
+        cur_layer2_error_frac = np.array([x[:,1] for x in cur_error_frac]).flatten()
+        cur_total_error_frac = np.array([x[:,2] for x in cur_error_frac]).flatten()
+        layer1_error_frac[ii] = np.mean(manage_db.logical_ix(cur_layer1_error_frac,cur_on_ix))
+        layer2_error_frac[ii] = np.mean(manage_db.logical_ix(cur_layer2_error_frac,cur_on_ix))
+        total_error_frac[ii] = np.mean(manage_db.logical_ix(cur_total_error_frac,cur_on_ix))
+
+        labtext.append(f"{get_label(cols,to_tuple(name),varnames_dict)}")
+
+    error_frac = {"Layer 1": layer1_error_frac, "Layer 2": layer2_error_frac, "total": total_error_frac}
+
+    labelloc = np.arange(len(labtext))
+    width = 0.25
+    multiplier = 0
+    for att, meas in error_frac.items():
+        offset = width*multiplier
+        rects = ax.bar(labelloc+offset,meas,width,label=att)
+        multiplier += 1
+
+    ax.set_ylabel("mean error fraction across ON genes")
+    ax.set_xticks(labelloc+width,labtext)
+    lg = ax.legend(loc="upper left")
+
+    if not title == "":
+        ax.set_title(title,wrap=True)
+    if not filename == "":
+        plt.savefig(filename)
+
+
+def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[]):
+    gb = df.groupby(cols,group_keys=True)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    def scatter_one(gr):
+        target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
+        cur_total_error_frac = gr["output_error"].to_list()
+        cur_total_error_frac = np.array([x[:,2] for x in cur_total_error_frac]).flatten()
+
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
+
+        ax.plot(target_pattern_vals,cur_total_error_frac,'o',ms=5,alpha=0.2,label=labtext)
+
+    gb.apply(scatter_one)
+
+    ax.set_xlabel("target expression level")
+    ax.set_ylabel("total error fraction")
+    ax.set_ylim(0,1)
+    lg = ax.legend(loc="upper left",markerscale=10)
+
+    for lgh in lg.get_lines():
+        lgh.set_alpha(1)
+        lgh.set_marker('.')
+
+    if not title == "":
+        ax.set_title(title,wrap=True)
+    if not filename == "":
+        plt.savefig(filename)
+
 
 def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[]):
     gb = df.groupby(cols,group_keys=True)
@@ -431,33 +501,6 @@ def scatter_patterning_residuals_groupby(df,cols,title="",filename="",ax=(),font
 
     ax.set_xlabel("target expression level")
     ax.set_ylabel("target expression level - actual expression level")
-    ax.legend(loc="lower left")
-
-    if not title == "":
-        ax.set_title(title,wrap=True)
-    if not filename == "":
-        plt.savefig(filename)
-
-def scatter_error_fraction_groupby(df,cols,title="",filename="",ax=(),fontsize=24):
-    gb = df.groupby(cols,group_keys=True)
-
-    if not ax:
-        fig, ax = plt.subplots(figsize=(24,24))
-
-    def scatter_one(gr):
-        target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
-        error_frac = np.array(gr["output_error"].to_list())
-        error_frac = [x[:,2] for x in error_frac]
-        error_frac = np.array(error_frac).flatten()
-
-        ax.scatter(target_pattern_vals,error_frac,s=5,alpha=0.2,label=f"{cols} = {gr.name}")
-        plt.rcParams.update({'font.size':fontsize})
-        plt.rc("legend",fontsize=np.round(fontsize*0.75))
-
-    gb.apply(scatter_one)
-
-    ax.set_xlabel("target expression level")
-    ax.set_ylabel("total error fraction")
     ax.legend(loc="lower left")
 
     if not title == "":

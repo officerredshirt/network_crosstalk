@@ -39,17 +39,18 @@ def main(argv):
     maxclust = 8
     m_gene = 250
 
-    df = df.loc[df["layer1_static"] == False]
+    df = df.loc[(df["layer1_static"] == False) & (df["ratio_KNS_KS"] > 100)]
 
     varnames_dict = plot_db.get_varname_to_value_dict(df)
 
-    # FIGURE 1
+    # FIGURE 2
+    """
     # main result: chromatin outperforms TF in terms of expression error
     plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                     (df["M_GENE"] == m_gene)],
                              ["ratio_KNS_KS"],
-                             f"../plots/fig/fig1_boxplot_chromatin_tf",
+                             f"../plots/fig/fig2_boxplot_chromatin_tf",
                              f"RMS global expression error",
                              plot_db.boxplot_groupby,
                              ["tf_first_layer"],
@@ -62,7 +63,7 @@ def main(argv):
                                     (df["M_GENE"] == m_gene) &
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust)],
                              ["tf_first_layer"],
-                             f"../plots/fig/fig1_scatter_target_expression_M_GENE{m_gene}_MAX_CLUSTERS_ACTIVE{maxclust}.png",
+                             f"../plots/fig/fig2_scatter_target_expression_M_GENE{m_gene}_MAX_CLUSTERS_ACTIVE{maxclust}.png",
                              f"target expression",
                              plot_db.scatter_target_expression_groupby,
                              ["ratio_KNS_KS"],fontsize=36,
@@ -74,7 +75,7 @@ def main(argv):
                                     (df["M_GENE"] == m_gene) &
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust)],
                              ["ratio_KNS_KS"],
-                             f"../plots/fig/fig1_scatter_patterning_residuals_M_GENE{m_gene}_MAX_CLUSTERS_ACTIVE{maxclust}.png",
+                             f"../plots/fig/fig2_scatter_patterning_residuals_M_GENE{m_gene}_MAX_CLUSTERS_ACTIVE{maxclust}.png",
                              f"global expression error",
                              plot_db.scatter_patterning_residuals_groupby,
                              ["tf_first_layer"],subplot_dim=(1,4),fontsize=48,
@@ -85,7 +86,7 @@ def main(argv):
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                     (df["M_GENE"] == m_gene)],
                              "ratio_KNS_KS",
-                             f"../plots/fig/fig1_boxplot_aggregate_error_percentage",
+                             f"../plots/fig/fig2_boxplot_aggregate_error_percentage",
                              f"percent global expression error from OFF genes",
                              plot_db.boxplot_groupby,
                              ["tf_first_layer"],
@@ -96,7 +97,7 @@ def main(argv):
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                     (df["M_GENE"] == m_gene)],
                              "ratio_KNS_KS",
-                             f"../plots/fig/fig1_boxplot_aggregate_error_off",
+                             f"../plots/fig/fig2_boxplot_aggregate_error_off",
                              f"cumulative global expression error from OFF genes",
                              plot_db.boxplot_groupby,
                              ["tf_first_layer"],
@@ -107,7 +108,7 @@ def main(argv):
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                     (df["M_GENE"] == m_gene)],
                              "ratio_KNS_KS",
-                             f"../plots/fig/fig1_boxplot_aggregate_error_high",
+                             f"../plots/fig/fig2_boxplot_aggregate_error_high",
                              f"cumulative global expression error from highly expressed genes (> {HIGHLY_EXPRESSING_THRESHOLD})",
                              plot_db.boxplot_groupby,
                              ["tf_first_layer"],
@@ -120,7 +121,7 @@ def main(argv):
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                     (df["M_GENE"] == m_gene)],
                              "ratio_KNS_KS",
-                             f"../plots/fig/fig1_boxplot_effective_dynamic_range",
+                             f"../plots/fig/fig2_boxplot_effective_dynamic_range",
                              f"effective dynamic range (max(ON) - min(ON))",
                              plot_db.boxplot_groupby,
                              ["tf_first_layer"],
@@ -131,13 +132,13 @@ def main(argv):
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                     (df["M_GENE"] == m_gene)],
                              "M_GENE",
-                             f"../plots/fig/fig1_boxplot_effective_dynamic_range_ratio",
+                             f"../plots/fig/fig2_boxplot_effective_dynamic_range_ratio",
                              f"ratio of effective dynamic range (max(ON) - min(ON))",
                              plot_db.boxplot_groupby,
                              ["ratio_KNS_KS"],
                              plot_db.ratio_effective_dynamic_range_by_pair,
+                             axlabel=[],
                              varnames_dict=varnames_dict)
-
 
     l2dict = {True:"layer2",False:""}
     for l2 in [True,False]:
@@ -149,8 +150,30 @@ def main(argv):
                                  plot_db.scatter_error_increase_by_modulating_concentration_groupby,
                                  ["tf_first_layer"],subplot_dim=(3,3),fontsize=52,
                                  varnames_dict=varnames_dict,layer2=l2)
+    """
 
+    # FIGURE 3
 
+    plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
+                                    (df["M_GENE"] == m_gene) &
+                                    (df["MAX_CLUSTERS_ACTIVE"] == maxclust)],
+                             ["tf_first_layer"],
+                             f"../plots/fig/fig3_scatter_error_fraction_M_GENE{m_gene}_MAX_CLUSTERS_ACTIVE{maxclust}.png",
+                             f"total error fraction",
+                             plot_db.scatter_error_fraction_groupby,
+                             ["ratio_KNS_KS"],subplot_dim=(1,2),fontsize=36,
+                             varnames_dict=varnames_dict)
+
+    plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
+                                    (df["M_GENE"] == m_gene) &
+                                    (df["MAX_CLUSTERS_ACTIVE"] == maxclust)],
+                             ["ratio_KNS_KS"],
+                             f"../plots/fig/fig3_bar_error_fraction_M_GENE{m_gene}_MAX_CLUSTERS_ACTIVE{maxclust}.png",
+                             "",
+                             plot_db.bar_error_fraction_groupby,
+                             ["tf_first_layer"],subplot_dim=(2,2),fontsize=36,
+                             varnames_dict=varnames_dict)
+    
 
 if __name__ == "__main__":
     main(sys.argv[1:])
