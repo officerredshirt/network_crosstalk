@@ -41,7 +41,7 @@ def main(argv):
     m_gene = 250
 
     df = df.loc[(df["layer1_static"] == False) & (df["ratio_KNS_KS"] > 100) &
-                (df["MIN_EXPRESSION"] == 0.3)]
+                (df["MIN_EXPRESSION"] < 0.3)]
 
     varnames_dict = plot_db.get_varname_to_value_dict(df)
 
@@ -259,7 +259,6 @@ def main(argv):
     plt.rcParams["font.size"] = f"{fntsz}"
 
     # FIGURE 2
-    """
     fig, ax =  plt.subplots(3,3,figsize=(36,36))
 
     plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
@@ -317,7 +316,7 @@ def main(argv):
                              plot_db.barchart_groupby,
                              ["ratio_KNS_KS","tf_first_layer"],
                              plot_db.effective_dynamic_range,
-                             ax=[ax[1][2]],legloc="lower right",
+                             ax=[ax[1][2]],legloc="upper left",#legloc="lower right",
                              subtitles=[""],fontsize=fntsz,
                              ylabel="effective dynamic range",
                              varnames_dict=varnames_dict)
@@ -348,14 +347,13 @@ def main(argv):
     plt.close()
     
 
-    """
     # FIGURE 3
     fig, ax =  plt.subplots(2,3,figsize=(36,24))
 
     plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 1000.0) &
                                     (df["M_GENE"] == m_gene) &
                                     (df["MAX_CLUSTERS_ACTIVE"] == maxclust)],
-                             ["tf_first_layer"],
+                             ["tf_first_layer","ratio_KNS_KS"],
                              [],[],
                              plot_db.scatter_target_expression_groupby,
                              ["minimize_noncognate_binding"],
