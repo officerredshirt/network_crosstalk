@@ -2,7 +2,6 @@
 # coding: utf-8
 from numpy import *
 from multiprocess import Pool
-import random as ran
 import shelve
 import sys, argparse
 import manage_db
@@ -39,13 +38,21 @@ def main(argv):
 
         # randomly choose number active clusters
         n_active_clusters = random.randint(MIN_CLUSTERS_ACTIVE,MAX_CLUSTERS_ACTIVE+1)
-        u[0:n_active_clusters] = [True]*n_active_clusters
 
-        # randomly assign expression levels to genes in clusters
-        n_active_genes = GENES_PER_CLUSTER*n_active_clusters
-        u[N_PF:N_PF+n_active_genes] = [True]*n_active_genes
-        target_pattern[0:n_active_genes] = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,n_active_genes)
-    
+        if target_independent_of_clusters:
+            target_pattern = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,M_GENE)
+            off_genes = random.choice(range(M_GENE),
+                                      size=GENES_PER_CLUSTER*(N_CLUSTERS - n_active_clusters),
+                                      replace=False)
+            target_pattern[off_genes.astype(int)] = 0
+        else:
+            u[0:n_active_clusters] = [True]*n_active_clusters
+
+            # randomly assign expression levels to genes in clusters
+            n_active_genes = GENES_PER_CLUSTER*n_active_clusters
+            u[N_PF:N_PF+n_active_genes] = [True]*n_active_genes
+            target_pattern[0:n_active_genes] = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,n_active_genes)
+        
         manage_db.add_pattern(database,local_id,array(u),target_pattern)
 
 

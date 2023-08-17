@@ -47,7 +47,7 @@ def main(argv):
     minimize_noncognate_binding = args.minimize_noncognate_binding
     model_folder = args.model_folder
     suppress_filesave = args.suppress_filesave
-
+    
     local_id = manage_db.extract_local_id(filename_in)
 
     # load target patterns
@@ -69,20 +69,47 @@ def main(argv):
 
     def optim(target_pattern):
         # optimize concentration of PFs and TFs in the input to reduce crosstalk metric
-        def crosstalk_objective_fn(c):
-            return crosstalk_metric(target_pattern,c[0:N_PF],c[N_PF:])
 
-        bnds = [(0,inf)]*(N_PF + N_TF)   # force concentrations positive
+        # decide whether to redo other optimizations with this setting...
+        if not target_independent_of_clusters:
+            N_TF_to_use = sum(target_pattern > 0)
+            N_PF_to_use = int(N_TF_to_use / GENES_PER_CLUSTER)
+
+            def crosstalk_objective_fn(c):
+                cp = concatenate((c[0:N_PF_to_use],[0]*(N_PF - N_PF_to_use)))
+                ct = concatenate((c[N_PF_to_use:],[0]*(N_TF - N_TF_to_use)))
+                return crosstalk_metric(target_pattern,cp,ct,
+                                        ignore_off_for_opt = ignore_off_during_optimization,
+                                        off_ixs = (target_pattern == 0))
+        else:
+            N_TF_to_use = N_TF
+            N_PF_to_use = N_PF
+
+            def crosstalk_objective_fn(c):
+                return crosstalk_metric(target_pattern,c[0:N_PF_to_use],c[N_PF_to_use:],
+                                        ignore_off_for_opt = ignore_off_during_optimization,
+                                        off_ixs = (target_pattern == 0))
+
+        bnds = [(0,inf)]*(N_PF_to_use + N_TF_to_use)    # force concentrations positive
 
         if not(manage_db.xtalk_result_found(database,local_id,int(minimize_noncognate_binding),int(tf_first_layer),target_pattern)):
             print(".",end="",flush=True)
             # starting point
-            c_0 = array([10]*(N_PF + N_TF))
+            c_0 = array([10]*(N_PF_to_use + N_TF_to_use))
             #c_0[cur_input] = 10 
 
             try:
                 optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
                                            method = "L-BFGS-B", options = {"maxfun":1000000})
+
+                if not target_independent_of_clusters:
+                    optres.x = concatenate((optres.x[0:N_PF_to_use],zeros(N_PF - N_PF_to_use),
+                                           optres.x[N_PF_to_use:],zeros(N_TF - N_TF_to_use)))
+
+                if ignore_off_during_optimization:
+                    # store actual error even though optimization itself ignores OFF genes
+                    optres.f = crosstalk_metric([], \
+                            optres.x[0:N_PF],optres.x[N_PF:])
                 output_expression = crosstalk_metric([], \
                         optres.x[0:N_PF],optres.x[N_PF:], \
                         return_var="gene_exp")#get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
@@ -94,7 +121,7 @@ def main(argv):
                 print("! ",end="",flush=True)
             except Exception as e:
                 print(f"optimization error \"{e}\"; skipping...")
-                pass
+                #pass
 
     with Pool() as pool:
         pool.map(optim,target_patterns[0:npatterns])

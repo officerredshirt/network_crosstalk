@@ -29,15 +29,15 @@ def main(argv):
 
 
     print("PARAMETERS")
-    manage_db.print_res(database,"parameters")
+    #manage_db.print_res(database,"parameters")
     print("")
 
     print("NETWORKS")
-    manage_db.print_res(database,"networks")
+    #manage_db.print_res(database,"networks")
     print("")
 
     print("PATTERNS")
-    manage_db.print_res(database,"patterns")
+    #manage_db.print_res(database,"patterns")
     print("")
     
     print("XTALK")

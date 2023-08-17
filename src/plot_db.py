@@ -753,7 +753,9 @@ def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
 
     def scatter_one(gr):
+        target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
         modulating_concentration_vals = np.array(gr["modulating_concentrations"].to_list()).flatten()
+        modulating_concentration_vals[target_pattern_vals == 0] = None
         optimized_input_vals = np.array(gr[["optimized_input","N_PF"]].apply(lambda x: x["optimized_input"][x["N_PF"]:],axis=1).to_list()).flatten()
         concentration_change = np.divide(modulating_concentration_vals,optimized_input_vals)
         if not layer2:
@@ -802,6 +804,7 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[],varnames_dic
     target_pattern_vals = np.array(df["target_pattern"].to_list()).flatten()
     optimized_input_vals = np.array(df[["optimized_input","N_PF"]].apply(lambda x: x["optimized_input"][x["N_PF"]:],axis=1).to_list()).flatten()
     modulating_concentration_vals = np.array(df["modulating_concentrations"].to_list()).flatten()
+    modulating_concentration_vals[target_pattern_vals == 0] = None
 
     # induction curve
     for cur_tf_pr_bound in tf_pr_bound.values():
@@ -884,24 +887,25 @@ def calc_modulating_concentrations(df):
             layer1_concentrations = row["optimized_input"][:row["N_PF"]]
             tf_concentrations = row["optimized_input"][row["N_PF"]:]
             for ii_gene, target_level in enumerate(row["target_pattern"]):
-                if row["tf_first_layer"]: # b/c crosslayer crosstalk permitted
-                    cur_noncognate_concentrations = np.sum(row["optimized_input"]) - tf_concentrations[ii_gene]
-                    noncognate_for_layer1 = cur_noncognate_concentrations
-                    layer1_pr_on = tf_chrom_equiv_pr_bound[db_folder]
-                else:
-                    layer1_pr_on = kpr_pr_open[db_folder]
-                    cur_noncognate_concentrations = np.sum(tf_concentrations) - tf_concentrations[ii_gene]
-                    noncognate_for_layer1 = np.sum(layer1_concentrations)
+                if target_level > 0:
+                        if row["tf_first_layer"]: # b/c crosslayer crosstalk permitted
+                            cur_noncognate_concentrations = np.sum(row["optimized_input"]) - tf_concentrations[ii_gene]
+                            noncognate_for_layer1 = cur_noncognate_concentrations
+                            layer1_pr_on = tf_chrom_equiv_pr_bound[db_folder]
+                        else:
+                            layer1_pr_on = kpr_pr_open[db_folder]
+                            cur_noncognate_concentrations = np.sum(tf_concentrations) - tf_concentrations[ii_gene]
+                            noncognate_for_layer1 = np.sum(layer1_concentrations)
 
-                layer1_probabilities = np.array(row["R"]).dot(layer1_pr_on(noncognate_for_layer1,layer1_concentrations))
-                target_corrected_for_layer1 = np.divide(row["target_pattern"],layer1_probabilities)
+                        layer1_probabilities = np.array(row["R"]).dot(layer1_pr_on(noncognate_for_layer1,layer1_concentrations))
+                        target_corrected_for_layer1 = np.divide(row["target_pattern"],layer1_probabilities)
 
-                modulating_concentrations[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(tf_pr_bound[db_folder],cur_noncognate_concentrations,x,target_corrected_for_layer1[ii_gene]),tf_concentrations[ii_gene])
+                        modulating_concentrations[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(tf_pr_bound[db_folder],cur_noncognate_concentrations,x,target_corrected_for_layer1[ii_gene]),tf_concentrations[ii_gene])
 
-                tf_concentrations_with_ii_modulated = tf_concentrations.copy()
-                tf_concentrations_with_ii_modulated[ii_gene] = modulating_concentrations[ii_gene]
-                error_metric_post_modulation[ii_gene] = crosstalk_metric(row["target_pattern"], \
-                        layer1_concentrations,tf_concentrations_with_ii_modulated)
+                        tf_concentrations_with_ii_modulated = tf_concentrations.copy()
+                        tf_concentrations_with_ii_modulated[ii_gene] = modulating_concentrations[ii_gene]
+                        error_metric_post_modulation[ii_gene] = crosstalk_metric(row["target_pattern"], \
+                                layer1_concentrations,tf_concentrations_with_ii_modulated)
 
             row["modulating_concentrations"] = np.array(modulating_concentrations)
             row["error_metric_post_modulation"] = np.array(error_metric_post_modulation)

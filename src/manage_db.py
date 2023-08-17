@@ -746,7 +746,8 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
     R_bool = (R != 0)
     T_bool = (T != 0)
 
-    def crosstalk_metric(x,c_PF,c_TF,return_var="metric"):
+    def crosstalk_metric(x,c_PF,c_TF,return_var="metric",
+                         ignore_off_for_opt=False,off_ixs=[]):
         def get_gene_exp(c_PF,c_TF):
             C_PF = sum(c_PF)
             C_TF = sum(c_TF)
@@ -787,9 +788,14 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
                 err_frac = get_error_frac(c_PF,c_TF)[:,2]
                 d1 = x - gene_exp*(1-err_frac)
                 d2 = gene_exp*err_frac
+                if ignore_off_for_opt:
+                    d1[off_ixs] = 0
+                    d2[off_ixs] = 0
                 return np.transpose(d1)@d1 + np.transpose(d2)@d2
             else:
                 d = x - get_gene_exp(c_PF,c_TF)
+                if ignore_off_for_opt:
+                    d[off_ixs] = 0
                 return np.transpose(d)@d
         else:
             print(f"unrecognized return variable option {return_var}")
