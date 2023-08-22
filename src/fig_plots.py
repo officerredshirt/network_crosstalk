@@ -41,7 +41,13 @@ def main(argv):
     m_gene = 250
 
     df = df.loc[(df["layer1_static"] == False) & (df["ratio_KNS_KS"] > 100) &
-                (df["MIN_EXPRESSION"] < 0.3)]
+               (df["MIN_EXPRESSION"] < 0.3)]
+
+    df_ignore_off = df.loc[df["ignore_off_during_optimization"] == True]
+    df_target_indep = df.loc[df["target_independent_of_clusters"] == True]
+    
+    df = df.loc[(df["ignore_off_during_optimization"] == False) &
+                (df["target_independent_of_clusters"] == False)]
 
     varnames_dict = plot_db.get_varname_to_value_dict(df)
 

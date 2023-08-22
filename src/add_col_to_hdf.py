@@ -23,7 +23,12 @@ def main(argv):
     if os.path.exists(hdf_filename):
         df = pandas.read_hdf(hdf_filename,key="df")
         #df["ratio_KNS_KS"] = df["K_NS"]/df["K_S"]
-        df["layer1_static"] = True
+        #df["layer1_static"] = True
+        #df["ignore_off_during_optimization"] = 0
+        #df["target_independent_of_clusters"] = 0
+        #df["layer1_static"] = df["layer1_static"].map({True:int(1),1:int(1),0:int(0)})
+        df["ignore_off_during_optimization"] = df["ignore_off_during_optimization"].fillna(int(0))
+        df["target_independent_of_clusters"] = df["target_independent_of_clusters"].fillna(int(0))
     else:
         print(f"error: nonexistent hdf file {hdf_filename}")
         return

@@ -108,7 +108,7 @@ def main(argv):
 
                 if ignore_off_during_optimization:
                     # store actual error even though optimization itself ignores OFF genes
-                    optres.f = crosstalk_metric([], \
+                    optres.f = crosstalk_metric(target_pattern, \
                             optres.x[0:N_PF],optres.x[N_PF:])
                 output_expression = crosstalk_metric([], \
                         optres.x[0:N_PF],optres.x[N_PF:], \
