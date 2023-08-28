@@ -29,7 +29,7 @@ def main(argv):
 
 
     print("PARAMETERS")
-    #manage_db.print_res(database,"parameters")
+    manage_db.print_res(database,"parameters")
     print("")
 
     print("NETWORKS")
@@ -41,7 +41,7 @@ def main(argv):
     print("")
     
     print("XTALK")
-    manage_db.print_res(database,"xtalk")
+    #manage_db.print_res(database,"xtalk")
     print("")
 
 

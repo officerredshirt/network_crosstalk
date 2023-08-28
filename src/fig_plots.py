@@ -13,6 +13,10 @@ import matplotlib.pyplot as plt
 
 HIGHLY_EXPRESSING_THRESHOLD = 0.8
 
+# FINAL CHECK: MAKE SURE ARE PLOTTING CORRECT ERROR METRIC IN ALL INSTANCES
+# (i.e., check calls that use df["fun"] vs. those that calculate patterning
+# error explicitly)
+
 def main(argv):
     parser = argparse.ArgumentParser(
             prog = "df_plots",

@@ -3,3 +3,9 @@ test_res/*
 *snakemake/metadata*
 cluster*
 __pycache__
+*.hdf
+old/old_outside_folder/*
+plots/*
+src/OLD_*
+src/OLD2_*
+test_set_res_target_patterns/*
