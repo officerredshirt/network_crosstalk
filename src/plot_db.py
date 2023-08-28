@@ -33,7 +33,11 @@ def get_varname_to_value_dict(df):
                     ("minimize_noncognate_binding",1):"penalize nontarget binding",
                     ("tf_first_layer",0):"chromatin",
                     ("tf_first_layer",1):"free DNA",
-                    "tf_first_layer":"TF first layer"}
+                    "tf_first_layer":"TF first layer",
+                    ("target_independent_of_clusters",0):"OFF genes aligned with clusters",
+                    ("target_independent_of_clusters",1):"OFF genes unaligned with clusters",
+                    ("ignore_off_during_optimization",0):"globally optimal",
+                    ("ignore_off_during_optimization",1):"optimal for ON genes"}
 
     varname_to_value = varname_to_value | boolean_vars
 
@@ -94,8 +98,14 @@ def combine_databases(db_filenames,df=[]):
         elif any([db_filename in x for x in df["filename"]]):
             print(f"{db_filename} already in dataframe--skipping...")
         else:
-            df = pd.concat([df,convert_to_dataframe(db_filename)])
+            new_df = convert_to_dataframe(db_filename)
+            if not set(["ignore_off_during_optimization","target_independent_of_clusters"]).issubset(new_df.columns):
+                new_df["ignore_off_during_optimization"] = int(0)
+                new_df["target_independent_of_clusters"] = int(0)
+            df = pd.concat([df,new_df])
     df.reset_index(drop=True,inplace=True)
+    df["N_PF"] = df["N_PF"].astype(pd.Int64Dtype())
+    df["N_TF"] = df["N_TF"].astype(pd.Int64Dtype())
     return df
 
 
@@ -108,7 +118,7 @@ def row_calc_patterning_error(df):
 
 
 def patterning_error(df):
-    return df.apply(row_calc_patterning_error,axis=1).apply(np.log)
+    return df.apply(row_calc_patterning_error,axis=1)
     
 
 def xtalk_by_gene(df):
@@ -117,7 +127,9 @@ def xtalk_by_gene(df):
 
 
 def rms_xtalk(df):
-    d = df["fun"].div(df.M_GENE,axis=0)
+    #d = df["fun"].div(df.M_GENE,axis=0)
+    d = patterning_error(df)
+    d = d.div(df.M_GENE,axis=0)
     return d.apply(np.sqrt)
 
 
@@ -363,7 +375,7 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
 
 
 def barchart_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",
-                     legloc="upper right"):
+                     legloc="upper right",axlabel=[]):
     if not len(cols) == 2:
         print("barchart_groupby requires len(cols) == 2")
         sys.exit()
@@ -394,12 +406,79 @@ def barchart_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabe
     multiplier = 0
     for att, vals in dd.items():
         offset = width*multiplier
-        rects = ax.bar(labelloc+offset,vals,width,label=get_label([cols[1]],to_tuple(att),varnames_dict))
+        ax.bar(labelloc+offset,vals,width,label=get_label([cols[1]],to_tuple(att),varnames_dict))
         multiplier += 1
 
     ax.set_ylabel(ylabel,wrap=True)
 
-    axlabel = []
+    try:
+        ix = axticklabs[0].index("=")
+        ticklab_prefixes = [x[0:ix] for x in axticklabs]
+        
+        if len(set(ticklab_prefixes)) == 1:
+            axlabel = ticklab_prefixes[0][:-1]
+            axticklabs = [x[ix+2:] for x in axticklabs]
+    except:
+        pass
+
+    if not axlabel:
+        axlabel = f"{tuple(cols)}"
+    ax.set_xlabel(axlabel,wrap=True)
+
+    ax.set_xticks(labelloc + width*((ncol1-1)/2),axticklabs)
+    lg = ax.legend(loc=legloc)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    if not title == "":
+        ax.set_title(title)
+
+    if not filename == "":
+        plt.rcParams.update({'font.size':24})
+        plt.savefig(filename)
+
+
+def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",
+                     legloc="upper right",axlabel=[],barcolors=[]):
+    if not len(cols) == 2:
+        print("barchart_groupby requires len(cols) == 2")
+        sys.exit()
+
+    df["rms"] = rms_xtalk(df)
+    vals_rms = (df.groupby(cols)["rms"].mean()).to_frame()
+    df["percent_off"] = percent_expression_err_from_ON_vs_OFF_genes(df)
+    vals_percent_off = (df.groupby(cols)["percent_off"].mean()).to_frame()
+
+    ncol0 = len(vals_rms.index.unique(level=cols[0]))
+    ncol1 = len(vals_rms.index.unique(level=cols[1]))
+
+    dd = {}
+    for ix in vals_rms.index:
+        dd.setdefault(ix[1],([],[]))
+        dd[ix[1]] = (dd[ix[1]][0] + [(vals_rms.loc[ix]["rms"])],
+                     dd[ix[1]][1] + [(vals_rms.loc[ix]["rms"])*vals_percent_off.loc[ix]["percent_off"]])
+
+    axticklabs = []
+    for col0_ix in vals_rms.index.unique(level=cols[0]):
+        axticklabs.append(get_label(cols,to_tuple(col0_ix),varnames_dict))
+
+    if not barcolors:
+        barcolors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    labelloc = np.arange(ncol0)
+    width = 0.25
+    multiplier = 0
+    bottom = np.zeros(len(dd[ix[1]]))
+    for ii, (att, vals) in enumerate(dd.items()):
+        offset = width*multiplier
+        ax.bar(labelloc+offset,vals[0],width,label=get_label([cols[1]],to_tuple(att),varnames_dict),
+               color=barcolors[ii])
+        ax.bar(labelloc+offset,vals[1],width,color=(0,0,0),alpha=0.5,label="")
+        multiplier += 1
+
+    ax.set_ylabel(ylabel,wrap=True)
+
     try:
         ix = axticklabs[0].index("=")
         ticklab_prefixes = [x[0:ix] for x in axticklabs]
@@ -769,7 +848,7 @@ def scatter_error_increase_by_modulating_concentration_groupby(df,cols,title="",
         labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
         ax.plot(concentration_change,error_increase,'o',ms=5,alpha=0.2,label=labtext)
-        ax.set_ylim(0,0.02)
+        ax.set_ylim(0,0.015)
 
     gb.apply(scatter_one)
 
@@ -884,8 +963,8 @@ def calc_modulating_concentrations(df):
 
             modulating_concentrations = np.zeros(len(row["target_pattern"]))
             error_metric_post_modulation = np.zeros(len(row["target_pattern"]))
-            layer1_concentrations = row["optimized_input"][:row["N_PF"]]
-            tf_concentrations = row["optimized_input"][row["N_PF"]:]
+            layer1_concentrations = row["optimized_input"][:int(row["N_PF"])]
+            tf_concentrations = row["optimized_input"][int(row["N_PF"]):]
             for ii_gene, target_level in enumerate(row["target_pattern"]):
                 if True:#target_level > 0:
                     if row["tf_first_layer"]: # b/c crosslayer crosstalk permitted
