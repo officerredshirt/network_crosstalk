@@ -11,6 +11,7 @@ import itertools
 import manage_db
 import pandas as pd
 from pandarallel import pandarallel
+import xarray
 
 pandarallel.initialize()
 
@@ -34,12 +35,12 @@ def get_varname_to_value_dict(df):
                     ("tf_first_layer",0):"chromatin",
                     ("tf_first_layer",1):"free DNA",
                     "tf_first_layer":"TF first layer",
-                    ("target_independent_of_clusters",0):"OFF genes aligned with clusters",
-                    ("target_independent_of_clusters",1):"OFF genes unaligned with clusters",
+                    ("target_independent_of_clusters",0):"OFF genes aligned\nwith clusters",
+                    ("target_independent_of_clusters",1):"OFF genes unaligned\nwith clusters",
                     ("ignore_off_during_optimization",0):"globally optimal",
                     ("ignore_off_during_optimization",1):"optimal for ON genes"}
 
-    varname_to_value = varname_to_value | boolean_vars
+    varname_to_value = varname_to_value | boolean_vars | varname_dict
 
     return varname_to_value
 
@@ -437,6 +438,56 @@ def barchart_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabe
     if not filename == "":
         plt.rcParams.update({'font.size':24})
         plt.savefig(filename)
+
+
+def colorplot_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[]):
+    if not len(cols) == 2:
+        print("ratio_colorplot_2d_groupby requires len(cols) == 2")
+        sys.exit()
+
+    print("Calculating...")
+    try:
+        df["temp_barchart_fn"] = f(df)
+        vals_test = (df.groupby(cols)["temp_barchart_fn"].mean()).to_frame()
+    except:
+        gb = df.groupby(cols,group_keys=True)
+        gb_f = gb.apply(f)
+        vals_test = gb_f.apply(lambda x: np.mean(x)).to_frame()
+        vals_test = vals_test.rename({0:"temp_barchart_fn"},axis="columns")
+
+    H = np.array(vals_test.to_xarray().to_array())[0]
+    l0 = vals_test.index.unique(level=cols[0])
+    l1 = vals_test.index.unique(level=cols[1])
+
+    print("Plotting...")
+    ax.imshow(H,interpolation="none",origin="lower",extent=[min(l1),max(l1),min(l0),max(l0)],
+              aspect=(max(l1)-min(l1))/(max(l0)-min(l0)),cmap="coolwarm")
+
+    for (j,i), label in np.ndenumerate(H):
+        j = ((j+0.5)/len(l0))*(max(l0)-min(l0))+min(l0)
+        i = ((i+0.5)/len(l1))*(max(l1)-min(l1))+min(l1)
+        ax.text(i,j,f"{label:.3f}",ha="center",va="center")
+
+    yticklocs = ((np.arange(0,H.shape[0])+0.5)/len(l0))*(max(l0)-min(l0))+min(l0)
+    xticklocs = ((np.arange(0,H.shape[1])+0.5)/len(l1))*(max(l1)-min(l1))+min(l1)
+
+    ax.set_xticks(xticklocs)
+    ax.set_xticklabels(l1)
+
+    ax.set_yticks(yticklocs)
+    ax.set_yticklabels(l0)
+
+    ax.set_xlabel(varnames_dict[cols[1]])
+    ax.set_ylabel(varnames_dict[cols[0]])
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    if not title == "":
+        ax.set_title(title)
+
+    if not filename == "":
+        plt.rcParams.update({'font.size':24})
 
 
 def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",

@@ -24,8 +24,12 @@ def main(argv):
         print(f"file {filename} not found")
         return
 
-    print(df.iloc[-1])
-    print(df.columns.values)
+    #print(df.iloc[1])
+    #print(df.columns.values)
+    df_nan = df.loc[pandas.isna(df["layer1_static"])]
+    nan_filenames = set(df_nan["filename"])
+    for file in nan_filenames:
+        print(file)
 
 
 if __name__ == "__main__":
