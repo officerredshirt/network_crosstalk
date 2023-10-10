@@ -88,7 +88,9 @@ def main(argv):
             def crosstalk_objective_fn(c):
                 return crosstalk_metric(target_pattern,c[0:N_PF_to_use],c[N_PF_to_use:],
                                         ignore_off_for_opt = ignore_off_during_optimization,
-                                        off_ixs = (target_pattern == 0))
+                                        off_ixs = (target_pattern == 0),
+                                        concentration_penalty = concentration_penalty,
+                                        cp = cp)
 
         bnds = [(0,inf)]*(N_PF_to_use + N_TF_to_use)    # force concentrations positive
 

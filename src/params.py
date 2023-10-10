@@ -11,12 +11,7 @@ M_ENH = M_GENE          # number enhancers
 
 ratio_KNS_KS = 1000
 layer1_static = False   # False if Layer 1 K_NS scales with same ratio as Layer 2
-ignore_off_during_optimization = True   # True if ignore errors from OFF genes during optimization
 target_independent_of_clusters = False  # True if target patterns defined independently from clusters
-
-if ignore_off_during_optimization and target_independent_of_clusters:
-    print("warning: reverting target_independent_of_clusters to False...")
-    target_independent_of_clusters = False
 
 # LAYER 1 (CHROMATIN)
 rp = 0
@@ -44,4 +39,11 @@ MIN_EXPRESSION = 0.3    # minimum expression level for a gene in a target patter
 MAX_EXPRESSION = 0.9    # maximum expression level for a gene in a target pattern
 
 # OPTIMIZATION
+ignore_off_during_optimization = True   # True if ignore errors from OFF genes during optimization
+concentration_penalty = False;  # True if apply penalty for high concentrations during optimization
+cp = 1e-1
 eps = 1e-10
+
+if ignore_off_during_optimization and target_independent_of_clusters:
+    print("warning: reverting target_independent_of_clusters to False...")
+    target_independent_of_clusters = False
