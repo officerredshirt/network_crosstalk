@@ -186,6 +186,20 @@ def main(argv):
                                         (df["ignore_off_during_optimization"] == 0)],
                                  ["ratio_KNS_KS"],
                                  [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["target_independent_of_clusters","tf_first_layer"],
+                                 ax=[axd["G"]],axlabel=" ",
+                                 legloc="upper left",subtitles=[""],
+                                 fontsize=fntsz,ylabel="global expression error",
+                                 varnames_dict=varnames_dict)
+
+        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 500) & 
+                                        (df["minimize_noncognate_binding"] == 0) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df["M_GENE"] == m_gene) &
+                                        (df["ignore_off_during_optimization"] == 0)],
+                                 ["ratio_KNS_KS"],
+                                 [],[],
                                  plot_db.rms_scatter_groupby,
                                  ["target_independent_of_clusters","tf_first_layer"],
                                  ax=[axd["G"]],

@@ -618,7 +618,7 @@ def rms_scatter_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylab
     df["rms_on_vals"] = np.multiply(rms_vals,1-percent_off_vals)
     df["rms_off_vals"] = np.multiply(rms_vals,percent_off_vals)
 
-    gb = df.groupby(cols[0])
+    gb = df.groupby(cols[1])
     df["gbix"] = gb.ngroup()
 
     ncol0 = len(set(df[cols[0]]))
@@ -626,23 +626,25 @@ def rms_scatter_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylab
 
     color_dict = get_varname_to_color_dict()
 
-    labelloc = np.arange(ncol0)
     width = 0.25
     multiplier = 0
+    axticklabs = []
+    labelloc = np.arange(ncol0)#+ncol0*width
     for ii in set(df["gbix"]):
         cur_df = df.loc[df["gbix"] == ii]
+        color_label = get_label([cols[1]],to_tuple(cur_df.tail(1)[cols[1]].values[0]),varnames_dict)
+        if color_label in color_dict.keys():
+            color = color_dict[color_label]
+        else:
+            color = "black"
 
-        subgrp = cur_df.groupby(cols[1])
+        subgrp = cur_df.groupby(cols[0])
         cur_df["sgbix"] = subgrp.ngroup()
 
         offset = width*multiplier
         def scatter_gr(gr):
-            label = get_label([cols[1]],to_tuple(gr.name),varnames_dict)
-
-            if label in color_dict.keys():
-                color = color_dict[label]
-            else:
-                color = "black"
+            label = get_label([cols[0]],to_tuple(gr.name),varnames_dict)
+            axticklabs.append(label)
 
             inner_multiplier = gr["sgbix"].unique()[0]
 
@@ -650,22 +652,16 @@ def rms_scatter_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylab
             rms_off_vals = np.array(gr["rms_off_vals"].to_list())
 
             ax.scatter(labelloc[inner_multiplier]+offset+np.random.uniform(low=-0.5*width,high=0.5*width,
-                size=len(rms_on_vals)),rms_on_vals,
-                color=color)
+                size=len(rms_on_vals)),rms_on_vals+rms_off_vals,marker="o",color=color*0.5)
             ax.scatter(labelloc[inner_multiplier]+offset+np.random.uniform(low=-0.5*width,high=0.5*width,
-                size=len(rms_off_vals)),rms_off_vals,
-                color=color*0.5)
+                size=len(rms_off_vals)),rms_off_vals,marker="x",color=color*0.1)
 
         subgrp.apply(scatter_gr)
 
         multiplier += 1
 
-    axticklabs = []
-    #for col0_ix in gb.keys():
-        #TODO: fix
-        #axticklabs.append(get_label(cols[0]),to_tuple(col0_ix),varnames_dict)
-
-    ax.set_xticks(labelloc + width*((ncol1-1)/2),axticklabs)
+    #axticklabs = axticklabs[0:ncol0]
+    #ax.set_xticks(labelloc + width*((ncol0-1)/2),axticklabs)
 
 def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",
                      legloc="upper right",axlabel=[],mastercolor=[],legncol=1,
