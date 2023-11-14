@@ -12,9 +12,9 @@ import warnings
 import matplotlib.pyplot as plt
 
 HIGHLY_EXPRESSING_THRESHOLD = 0.8
-GEN_FIGURE_2 = True
+GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
-GEN_TESTING = False
+GEN_TESTING = True
 
 pandas.options.mode.chained_assignment = None
 
@@ -248,6 +248,7 @@ def main(argv):
 
     if GEN_TESTING:
         # ----- TESTING ----- #
+        #fig, ax =  plt.subplots(4,4,figsize=(48,48))
         fig, ax =  plt.subplots(4,4,figsize=(48,48))
         #plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
         #                                       (df_normal["minimize_noncognate_binding"] == 0)],
@@ -259,19 +260,32 @@ def main(argv):
         #                         subtitles=["fold-improvement in global expression error \non using chromatin"], 
         #                         ax=[ax[0][2]],fontsize=fntsz,
         #                         varnames_dict=varnames_dict)
+        """
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
                                                (df_normal["minimize_noncognate_binding"] == 0)],
-                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 ["tf_first_layer"],
                                  [],[],
                                  plot_db.colorplot_2d_groupby,
                                  ["MAX_CLUSTERS_ACTIVE","M_GENE"],
-                                 plot_db.rms_xtalk,
+                                 plot_db.rms_patterning_error,
                                  ax=ax[0][0:2],fontsize=fntsz,
-                                 varnames_dict=varnames_dict)
+                                 varnames_dict=varnames_dict,
+                                 colorbar_lims=[0,0.05])
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+                                               (df_normal["minimize_noncognate_binding"] == 0)],
+                                 ["tf_first_layer"],
+                                 [],[],
+                                 plot_db.colorplot_2d_groupby,
+                                 ["MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 plot_db.effective_dynamic_range,
+                                 ax=ax[0][2:],fontsize=fntsz,
+                                 varnames_dict=varnames_dict,
+                                 colorbar_lims=[0.6,0.8])
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
                                                (df_normal["ratio_KNS_KS"] == 1000)],
-                                 ["ratio_KNS_KS","MAX_CLUSTERS_ACTIVE"],
+                                 ["MAX_CLUSTERS_ACTIVE"],
                                  [],[],
                                  plot_db.rms_barchart_groupby,
                                  ["M_GENE","tf_first_layer"],
@@ -280,7 +294,26 @@ def main(argv):
                                  fontsize=fntsz,ylabel="global expression error",
                                  varnames_dict=varnames_dict)
 
-        """
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000)],
+                                 ["ratio_KNS_KS"],
+                                 [],[],
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 plot_db.rms_patterning_error,
+                                 ax=[ax[2][0]],fontsize=fntsz,
+                                 xlabel="global expression error",
+                                 varnames_dict=varnames_dict)
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000)],
+                                 ["ratio_KNS_KS"],
+                                 [],[],
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 plot_db.effective_dynamic_range,
+                                 ax=[ax[2][1]],fontsize=fntsz,
+                                 xlabel="dynamic range",
+                                 varnames_dict=varnames_dict)
+
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000)],
                                  ["ratio_KNS_KS","tf_first_layer"],
                                  [],[],
@@ -289,7 +322,7 @@ def main(argv):
                                  plot_db.ratio_rms_error_patterning_noncognate_by_pair,
                                  ax=ax[2][0:2],fontsize=fntsz,
                                  varnames_dict=varnames_dict)
-        """
+        
         plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 500) & 
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
@@ -299,7 +332,21 @@ def main(argv):
                                  [],[],
                                  plot_db.regulator_concentration_groupby,
                                  ["tf_first_layer"],
-                                 ax=ax[2][1:],fontsize=fntsz,
+                                 ax=ax[3][0:],fontsize=fntsz,
+                                 varnames_dict=varnames_dict)
+        """
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["tf_first_layer"] == 0) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df_normal["M_GENE"] == m_gene)],
+                                 "M_GENE",
+                                 [],[],
+                                 plot_db.symbolscatter_groupby,
+                                 ["ratio_KNS_KS","minimize_noncognate_binding"],
+                                 plot_db.rms_patterning_error,
+                                 ax=[ax[3][2]],suppress_leg=True,
+                                 subtitles=[""],fontsize=insetfntsz,#linewidth=2,markersize=10,
+                                 yticks=[0.1,0.3,0.5],
                                  varnames_dict=varnames_dict)
     
         fig.tight_layout()

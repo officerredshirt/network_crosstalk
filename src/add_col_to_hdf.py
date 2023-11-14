@@ -31,10 +31,13 @@ def main(argv):
         #df["target_independent_of_clusters"] = df["target_independent_of_clusters"].fillna(int(0))
         #df["ignore_off_during_optimization"] = df["ignore_off_during_optimization"].map({1:int(1),0:int(0),False:int(0),True:int(1)})
         #df["target_independent_of_clusters"] = df["target_independent_of_clusters"].map({1:int(1),0:int(0),False:int(0),True:int(1)})
-        df = df.loc[df["filename"].apply(lambda x: '-07-' in x) | df["filename"].apply(lambda x: '-08-' in x)]
-        df_filenames = set(df["filename"])
-        for file in df_filenames:
-            print(file)
+        df["layer2_repressors"] = df["layer2_repressors"].fillna(int(0))
+        df["layer2_repressors"] = df["layer2_repressors"].map({1:int(1),0:int(0),False:int(0),True:int(1)})
+
+        #df = df.loc[df["filename"].apply(lambda x: '-07-' in x) | df["filename"].apply(lambda x: '-08-' in x)]
+        #df_filenames = set(df["filename"])
+        #for file in df_filenames:
+            #print(file)
     else:
         print(f"error: nonexistent hdf file {hdf_filename}")
         return

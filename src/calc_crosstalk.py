@@ -54,7 +54,7 @@ def main(argv):
     input_for_target, target_patterns = manage_db.get_target_patterns(database,local_id)
 
     # load crosstalk metric
-    crosstalk_metric = manage_db.get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,model_folder)
+    crosstalk_metric = manage_db.get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder)
 
     if npatterns > len(target_patterns):
         npatterns = len(target_patterns)
@@ -71,7 +71,7 @@ def main(argv):
         # optimize concentration of PFs and TFs in the input to reduce crosstalk metric
 
         # decide whether to redo other optimizations with this setting...
-        if not target_independent_of_clusters:
+        if (not target_independent_of_clusters) and (not layer2_repressors):
             N_TF_to_use = sum(target_pattern > 0)
             N_PF_to_use = int(N_TF_to_use / GENES_PER_CLUSTER)
 
@@ -82,7 +82,7 @@ def main(argv):
                                         ignore_off_for_opt = ignore_off_during_optimization,
                                         off_ixs = (target_pattern == 0))
         else:
-            N_TF_to_use = N_TF
+            N_TF_to_use = N_TF + (layer2_repressors)*N_TF
             N_PF_to_use = N_PF
 
             def crosstalk_objective_fn(c):
@@ -104,7 +104,7 @@ def main(argv):
                 optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
                                            method = "L-BFGS-B", options = {"maxfun":1000000})
 
-                if not target_independent_of_clusters:
+                if (not target_independent_of_clusters) and (not layer2_repressors):
                     optres.x = concatenate((optres.x[0:N_PF_to_use],zeros(N_PF - N_PF_to_use),
                                            optres.x[N_PF_to_use:],zeros(N_TF - N_TF_to_use)))
 
@@ -114,10 +114,10 @@ def main(argv):
                             optres.x[0:N_PF],optres.x[N_PF:])
                 output_expression = crosstalk_metric([], \
                         optres.x[0:N_PF],optres.x[N_PF:], \
-                        return_var="gene_exp")#get_gene_exp(optres.x[0:N_PF],optres.x[N_PF:])
+                        return_var="gene_exp")
                 output_error = crosstalk_metric([], \
                         optres.x[0:N_PF],optres.x[N_PF:], \
-                        return_var="error_frac")#get_error_frac(optres.x[0:N_PF],optres.x[N_PF:])
+                        return_var="error_frac")
                 max_expression = crosstalk_metric([],[],[],return_var="max_expression")
                 manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression)
                 print("! ",end="",flush=True)

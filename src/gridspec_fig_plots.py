@@ -1,5 +1,3 @@
-from numpy import *
-
 import shelve
 import dill
 import manage_db
@@ -11,11 +9,14 @@ import numpy as np
 import warnings
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
+from matplotlib.ticker import FormatStrFormatter
 
 HIGHLY_EXPRESSING_THRESHOLD = 0.8
-GEN_FIGURE_2 = True
+RATIO_FOR_SINGLE_EXAMPLES = 1000
+GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
-GEN_TESTING = False
+GEN_FIGURE_4 = True
+GEN_SUPPLEMENTAL = False
 
 pandas.options.mode.chained_assignment = None
 
@@ -68,14 +69,13 @@ def main(argv):
 
     # ----- FIGURE 2 ----- #
     if GEN_FIGURE_2:
-        #fig, ax =  plt.subplots(3,2,figsize=(28,44))
         fig = plt.figure(figsize=(28,36),layout="tight")
 
         outer = gs.GridSpec(3,1,height_ratios=[1,1,1])
         inner0 = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = outer[0])
         inner1 = gs.GridSpecFromSubplotSpec(1,3,subplot_spec = outer[1],width_ratios=[1,1,0.75],
                                             wspace=0.25)
-        inner2 = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = outer[2])
+        inner2 = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = outer[2],width_ratios=[0.25,1])
 
         ratios = gs.GridSpecFromSubplotSpec(2,1,subplot_spec = inner1[2],hspace=0.05)
         scattermod = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = inner2[1],wspace=0.05)
@@ -99,6 +99,20 @@ def main(argv):
                                  ["ratio_KNS_KS"],
                                  fontsize=fntsz,ax=[axd["A"],axd["B"]],
                                  varnames_dict=varnames_dict)
+        drmin = 0.26
+        drmax = 0.75
+        drxpos = 0.97
+        arrowprops = dict(arrowstyle="<->",linewidth=2,mutation_scale=40)
+        lineprops = dict(arrowstyle="-",linewidth=2,mutation_scale=40,
+                               edgecolor=[0.5,0.5,0.5])
+        axd["A"].annotate("",xy=(drxpos,drmin),xytext=(drxpos,drmax),
+                          arrowprops=arrowprops)
+        axd["A"].annotate("",xy=(drmin+0.01,drmin),xytext=(drxpos,drmin),
+                          arrowprops=lineprops)
+        axd["A"].annotate("",xy=(0.9,drmax),xytext=(drxpos,drmax),
+                          arrowprops=lineprops)
+        axd["A"].text(drxpos-0.015,drmin+(drmax-drmin)/2,"dynamic range",
+                      va="center",ha="right",rotation=90)
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
                                         (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
@@ -127,24 +141,6 @@ def main(argv):
                                  yticks=[0.1,0.3,0.5],
                                  varnames_dict=varnames_dict)
         
-
-        # PUT IN SUPPLEMENT
-        """
-        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 500) & 
-                                        (df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
-                                        (df["target_independent_of_clusters"] == 0)],
-                                 ["ratio_KNS_KS"],
-                                 [],[],
-                                 plot_db.rms_barchart_groupby,
-                                 ["ignore_off_during_optimization","tf_first_layer"],
-                                 ax=[ax[0][1]],axlabel=" ",
-                                 legloc="upper left",
-                                 fontsize=fntsz,ylabel="global expression error",
-                                 varnames_dict=varnames_dict)
-        """
-
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
                                         (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df_normal["M_GENE"] == m_gene)],
@@ -179,7 +175,7 @@ def main(argv):
         axd["E"].set_box_aspect(1.2)
         axd["F"].set_box_aspect(1)
         
-        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 500) & 
+        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df["M_GENE"] == m_gene) &
@@ -192,8 +188,7 @@ def main(argv):
                                  legloc="upper left",subtitles=[""],
                                  fontsize=fntsz,ylabel="global expression error",
                                  varnames_dict=varnames_dict)
-
-        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 500) & 
+        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) & 
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df["M_GENE"] == m_gene) &
@@ -203,14 +198,17 @@ def main(argv):
                                  plot_db.rms_scatter_groupby,
                                  ["target_independent_of_clusters","tf_first_layer"],
                                  ax=[axd["G"]],
-                                 legloc="upper left",subtitles=[""],
+                                 legloc="upper left",#subtitles=[""],
                                  fontsize=fntsz,ylabel="global expression error",
                                  varnames_dict=varnames_dict)
+        axd["G"].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        axd["G"].text(0.38,0.75,f"intrinsic\nspecificity\n= {RATIO_FOR_SINGLE_EXAMPLES}",
+                      transform=axd["G"].transAxes,va="center",ha="center")
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["M_GENE"] == m_gene) &
                                         (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["ratio_KNS_KS"] == 1000.0)],
+                                        (df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)],
                                  ["tf_first_layer"],
                                  [],[],
                                  plot_db.scatter_modulating_concentrations,
@@ -221,52 +219,62 @@ def main(argv):
         axd["I"].set_xticks([1e0,1e1,1e2])
         plt.setp(axd["I"].get_yticklabels(),visible=False)
 
-        """
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["M_GENE"] == m_gene) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["ratio_KNS_KS"] == 1000.0)],
-                                 ["ratio_KNS_KS"],
-                                 [],[],
-                                 plot_db.scatter_error_increase_by_modulating_concentration_groupby,
-                                 ["tf_first_layer"],
-                                 ax=[ax[2][2]],fontsize=fntsz,
-                                 varnames_dict=varnames_dict)
-        """
+        plt.gcf().text(0.01,0.950,"A",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.01,0.635,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.37,0.635,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.72,0.647,"D",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.01,0.317,"E",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.26,0.317,"F",fontsize=fntsz,fontweight="bold")
 
-        #fig.tight_layout()
         plt.savefig("../plots/fig/fig2.png")
         plt.close()
     
-
     # ----- FIGURE 3 ----- #
     if GEN_FIGURE_3:
-        fig, ax =  plt.subplots(3,3,figsize=(36,36))
+        fig = plt.figure(figsize=(28,36),layout="tight")
 
-        # ROW 1
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000.0) &
+        outer = gs.GridSpec(3,1,height_ratios=[1,1,0.8])
+        inner0 = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = outer[0])
+        inner1 = gs.GridSpecFromSubplotSpec(1,3,subplot_spec = outer[1])
+        inner2 = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = outer[2],wspace=0.05)
+
+        axd = {"A":plt.subplot(inner0[0]),
+               "B":plt.subplot(inner0[1]),
+               "C":plt.subplot(inner1[0]),
+               "D":plt.subplot(inner1[1]),
+               "E":plt.subplot(inner1[2]),
+               "F":plt.subplot(inner2[0]),
+               "G":plt.subplot(inner2[1])}
+
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                                         (df_normal["M_GENE"] == m_gene) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
-                                 ["tf_first_layer","ratio_KNS_KS"],
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)],
+                                 ["tf_first_layer"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
                                  ["minimize_noncognate_binding"],
-                                 ax=ax[0][0:2],fontsize=fntsz,
+                                 ax=[axd["C"],axd["D"]],fontsize=fntsz,
+                                 colorbar_leg=False,
                                  varnames_dict=varnames_dict)
+        box1 = axd["C"].get_position()
+        box2 = axd["D"].get_position()
+        axd["C"].text(1.1,1.2,f"intrinsic specificity = {RATIO_FOR_SINGLE_EXAMPLES}",fontsize=fntsz,
+                      ha="center",va="center")
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df_normal["M_GENE"] == m_gene)],
                                  "M_GENE",
                                  [],[],
-                                 plot_db.barchart_groupby,
-                                 ["ratio_KNS_KS","tf_first_layer"],
-                                 plot_db.ratio_rms_error_patterning_noncognate_by_pair,
-                                 subtitles=["fold-change in global expression error \nwhen co-opt nontarget binding"],
-                                 ax=[ax[0][2]],fontsize=fntsz,
-                                 ylabel="fold-change",
+                                 plot_db.symbolscatter_groupby,
+                                 ["ratio_KNS_KS","tf_first_layer","minimize_noncognate_binding"],
+                                 plot_db.rms_patterning_error,
+                                 subtitles=[""],
+                                 ax=[axd["E"]],fontsize=fntsz,take_ratio=True,
+                                 ylabel="fold-change in error upon co-opting",
                                  varnames_dict=varnames_dict)
 
-        # ROW 2
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
                                         (df_normal["M_GENE"] == m_gene) &
                                         (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
@@ -274,74 +282,119 @@ def main(argv):
                                  [],[],
                                  plot_db.scatter_error_fraction_groupby,
                                  ["ratio_KNS_KS"],
-                                 ax=ax[1][0:2],fontsize=fntsz,
+                                 ax=[axd["A"],axd["B"]],fontsize=fntsz,
                                  varnames_dict=varnames_dict)
 
-        fig.tight_layout()
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                               (df_normal["M_GENE"] == m_gene)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","ratio_KNS_KS"],
+                                 plot_db.rms_patterning_error,
+                                 ax=[axd["F"]],fontsize=fntsz,draw_lines=True,markeralpha=1,
+                                 size_lims=[500,500],
+                                 subtitles=[""],ylabel="global expression error",
+                                 varnames_dict=varnames_dict)
+        xticks = [1e2,1e3,1e4]
+        axd["F"].set_xticks(xticks)
+        axd["F"].plot([1e2,1e4],[0.018,0.018],"gray",linewidth=2,linestyle="dashed")
+        axd["F"].set_xlim(xticks[0],xticks[-1])
+
+        plt.gcf().text(0.01,0.96,"A",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.01,0.62,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.66,0.625,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.01,0.275,"D",fontsize=fntsz,fontweight="bold")
+
         plt.savefig("../plots/fig/fig3.png")
         plt.close()
 
+    # ----- FIGURE 4 ----- #
+    if GEN_FIGURE_4:
+        fig, ax = plt.subplots(2,3,figsize=(42,42),layout="tight")
 
-    if GEN_TESTING:
-        # ----- TESTING ----- #
-        fig, ax =  plt.subplots(4,4,figsize=(48,48))
-        #plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
-        #                                       (df_normal["minimize_noncognate_binding"] == 0)],
-        #                         "ratio_KNS_KS",
-        #                         [],[],
-        #                         plot_db.colorplot_2d_groupby,
-        #                         ["MAX_CLUSTERS_ACTIVE","M_GENE"],
-        #                         lambda x: np.reciprocal(plot_db.ratio_rms_xtalk_chromatin_tf_by_pair(x)),
-        #                         subtitles=["fold-improvement in global expression error \non using chromatin"], 
-        #                         ax=[ax[0][2]],fontsize=fntsz,
-        #                         varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
                                                (df_normal["minimize_noncognate_binding"] == 0)],
-                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 ["ratio_KNS_KS"],
                                  [],[],
-                                 plot_db.colorplot_2d_groupby,
-                                 ["MAX_CLUSTERS_ACTIVE","M_GENE"],
-                                 plot_db.rms_xtalk,
-                                 ax=ax[0][0:2],fontsize=fntsz,
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 plot_db.rms_patterning_error,
+                                 ax=[ax[0][0]],fontsize=fntsz,
+                                 suppress_leg=True,draw_lines=True,
+                                 ylabel="global expression error",
                                  varnames_dict=varnames_dict)
 
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                               (df_normal["ratio_KNS_KS"] == 1000)],
-                                 ["ratio_KNS_KS","MAX_CLUSTERS_ACTIVE"],
+        collapse_exponent_free_DNA = 1.3
+        collapse_exponent_chromatin = 2.6
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+                                               (df_normal["minimize_noncognate_binding"] == 0)],
+                                 ["ratio_KNS_KS"],
                                  [],[],
-                                 plot_db.rms_barchart_groupby,
-                                 ["M_GENE","tf_first_layer"],
-                                 ax=ax[1][0:],
-                                 legloc="right",
-                                 fontsize=fntsz,ylabel="global expression error",
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 lambda x: plot_db.curve_collapse(x,collapse_exponent_free_DNA),
+                                 ax=[ax[0][1]],fontsize=fntsz,
+                                 suppress_leg=True,draw_lines=True,
+                                 ylabel=f"RMSE / (# ON genes)^{collapse_exponent_free_DNA}",
                                  varnames_dict=varnames_dict)
 
-        """
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000)],
-                                 ["ratio_KNS_KS","tf_first_layer"],
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+                                               (df_normal["minimize_noncognate_binding"] == 0)],
+                                 ["ratio_KNS_KS"],
                                  [],[],
-                                 plot_db.colorplot_2d_groupby,
-                                 ["MAX_CLUSTERS_ACTIVE","M_GENE"],
-                                 plot_db.ratio_rms_error_patterning_noncognate_by_pair,
-                                 ax=ax[2][0:2],fontsize=fntsz,
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 lambda x: plot_db.curve_collapse(x,collapse_exponent_chromatin),
+                                 ax=[ax[0][2]],fontsize=fntsz,
+                                 suppress_leg=True,draw_lines=True,
+                                 ylabel=f"RMSE / (# ON genes)^{collapse_exponent_chromatin}",
                                  varnames_dict=varnames_dict)
-        """
-        plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == 500) & 
-                                        (df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
-                                        (df["target_independent_of_clusters"] == 0)],
-                                 ["ignore_off_during_optimization"],
+        #ax[0][2].set_ylim(0,5e-13)
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["tf_first_layer"] == 0) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df_normal["M_GENE"] == m_gene)],
+                                 "M_GENE",
                                  [],[],
-                                 plot_db.regulator_concentration_groupby,
-                                 ["tf_first_layer"],
-                                 ax=ax[2][1:],fontsize=fntsz,
+                                 plot_db.symbolscatter_groupby,
+                                 ["ratio_KNS_KS","minimize_noncognate_binding"],
+                                 plot_db.rms_patterning_error,
+                                 ax=[ax[1][0]],suppress_leg=False,
+                                 subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
                                  varnames_dict=varnames_dict)
-    
-        fig.tight_layout()
-        plt.savefig("../plots/fig/test.png")
+        ax[1][0].set_ylabel("patterning error")
+
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["tf_first_layer"] == 0) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df_normal["M_GENE"] == m_gene)],
+                                 "M_GENE",
+                                 [],[],
+                                 plot_db.symbolscatter_groupby,
+                                 ["ratio_KNS_KS","minimize_noncognate_binding"],
+                                 lambda x: np.log(plot_db.rms_patterning_error(x)),
+                                 ax=[ax[1][1]],suppress_leg=False,
+                                 subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
+                                 varnames_dict=varnames_dict)
+        ax[1][1].set_ylabel("patterning error")
+
+        plt.savefig("../plots/fig/fig4.png")
         plt.close()
-    
+
+
+
+        if GEN_SUPPLEMENTAL:
+            plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 1) &
+                                            (df_normal["M_GENE"] == m_gene) &
+                                            (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.scatter_error_fraction_groupby,
+                                     ["ratio_KNS_KS"],
+                                     ax=[axd["F"],axd["G"]],fontsize=fntsz,
+                                     varnames_dict=varnames_dict)
+            # TODO: colorscatter for dynamic range?
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -17,6 +17,7 @@ import xarray
 pandarallel.initialize()
 
 TICK_FONT_RATIO = 3/4
+LEG_FONT_RATIO = 3/4
 
 def get_varname_to_value_dict(df):
     varname_dict = {"ratio_KNS_KS":"intrinsic specificity",#"$K_{NS}/K_S$",
@@ -32,8 +33,8 @@ def get_varname_to_value_dict(df):
         labels_per_key = [f"{varname_dict[x[0]]} = {int(x[1])}" for x in key_val_pairs]
         varname_to_value = varname_to_value | dict(zip(key_val_pairs,labels_per_key))
 
-    boolean_vars = {("minimize_noncognate_binding",0):"optimal",
-                    ("minimize_noncognate_binding",1):"penalize nontarget binding",
+    boolean_vars = {("minimize_noncognate_binding",0):"optimize target expression levels",
+                    ("minimize_noncognate_binding",1):"optimize target binding profiles",
                     ("tf_first_layer",0):"chromatin",
                     ("tf_first_layer",1):"free DNA",
                     "tf_first_layer":"TF first layer",
@@ -136,8 +137,18 @@ def xtalk_by_gene(df):
 def rms_patterning_error(df):
     #d = df["fun"].div(df.M_GENE,axis=0)
     d = patterning_error(df)
-    d = d.div(df.M_GENE,axis=0)
+    d = d.div(df["M_GENE"],axis=0)
     return d.apply(np.sqrt)
+
+def curve_collapse(df,exponent):
+    d = rms_patterning_error(df)
+    fraction_active = df["MAX_CLUSTERS_ACTIVE"].div(df["N_CLUSTERS"],axis=0)
+    n_active_genes = fraction_active.multiply(df["M_GENE"],axis=0)
+    #denominator = np.power(n_active_genes,exponent*np.ones(len(df)))
+    denominator = np.power(n_active_genes,exponent*np.ones(len(df)))
+    d = d.div(denominator,axis=0)
+    #d = d.div(df["M_GENE"].apply(lambda x: np.power(x,0)),axis=0)
+    return d
 
 
 def cumulative_expression_err_from_high_genes(df,thresh):
@@ -390,12 +401,14 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
         plt.close()
 
 
-def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",fontsize=24,
+def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],
+                          ax=[],ylabel="mean",fontsize=24,
                           legloc="upper right",axlabel=[],logxax=True,suppress_leg=False,
-                          linewidth=5,markersize=20,take_ratio=False,color="black",
+                          linewidth=3,markersize=15,take_ratio=False,
+                          color="black",
                           xticks=None,yticks=None,legncol=1,**kwargs):
-    if not len(cols) == 2:
-        print("symbolscatter_groupby requires len(cols) == 2")
+    if not ((len(cols) > 1) & (len(cols) < 4)):
+        print("symbolscatter_groupby requires 2 or 3 cols")
         sys.exit()
 
     try:
@@ -413,24 +426,29 @@ def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
     vals_test = vals_test.reset_index()
     #vals_std = vals_std.reset_index()
     
+    last_col_ix = len(cols)-1
     if take_ratio:
         def gr_take_ratio(gr):
-            numerator = gr.loc[gr[cols[1]] == 0]
-            denominator = gr.loc[gr[cols[1]] != 0]
+            numerator = gr.loc[gr[cols[last_col_ix]] == 0]
+            denominator = gr.loc[gr[cols[last_col_ix]] != 0]
             if (not len(numerator["temp_barchart_fn"]) == 1) | (not len(denominator["temp_barchart_fn"]) == 1):
                 print("error: need 2 items to take ratio")
                 sys.exit()
             return numerator["temp_barchart_fn"].values / denominator["temp_barchart_fn"].values
 
-        new_gb = vals_test.groupby(cols[0])
-        ratios = new_gb.apply(gr_take_ratio).reset_index(name="ratio")
+        new_gb = vals_test.groupby(cols[0:last_col_ix])
+        vals_test = new_gb.apply(gr_take_ratio).reset_index(name="temp_barchart_fn")
 
-        ax.plot(ratios[cols[0]].values,ratios["ratio"].values,color=color,
+    if len(vals_test.columns) == 2:
+        ax.plot(vals_test[cols[0]].values,vals_test["temp_barchart_fn"].values,color=color,
                 linewidth=linewidth,marker="h",markersize=markersize)
+        #ax.plot(ratios[cols[0]].values,ratios["ratio"].values,color=color,
+                #linewidth=linewidth,marker="h",markersize=markersize)
     else:
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
         markers = ["o","D"]
         color_dict = get_varname_to_color_dict()
+
 
         for ii, prop in enumerate(set(vals_test[cols[1]])):
             label = get_label([cols[1]],to_tuple(prop),varnames_dict)
@@ -464,7 +482,7 @@ def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
     ax.set_xlabel(axlabel,wrap=True,fontsize=fontsize)
 
     if not suppress_leg:
-        lg = ax.legend(loc=legloc,ncol=legncol,frameon=False)
+        lg = ax.legend(loc=legloc,ncol=legncol,frameon=False,fontsize=round(LEG_FONT_RATIO*fontsize))
 
     if not ax:
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
@@ -478,7 +496,7 @@ def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
 
 
 def barchart_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",
-                     legloc="upper right",axlabel=[],mastercolor=[],legncol=1):
+                     legloc="upper right",axlabel=[],mastercolor=[],legncol=1,fontsize=24):
     if not len(cols) == 2:
         print("barchart_groupby requires len(cols) == 2")
         sys.exit()
@@ -537,7 +555,7 @@ def barchart_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabe
     ax.set_xlabel(axlabel,wrap=True)
 
     ax.set_xticks(labelloc + width*((ncol1-1)/2),axticklabs)
-    lg = ax.legend(loc=legloc,ncol=legncol)
+    lg = ax.legend(loc=legloc,ncol=legncol,fontsize=round(LEG_FONT_RATIO*fontsize))
 
     if not ax:
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
@@ -550,7 +568,101 @@ def barchart_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabe
         plt.savefig(filename)
 
 
-def colorplot_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[]):
+def get_color_from_label(label,mastercolor):
+    color_dict = get_varname_to_color_dict()
+    if label in color_dict.keys():
+        color = color_dict[label]
+    else:
+        color = mastercolor
+    return color
+
+
+def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
+                            mastercolor=[1,1,1],sizenorm_lims=[],size_lims=[500,2000],
+                            ylabel=[],fontsize=24,draw_lines=False,markeralpha=0.6,
+                            suppress_leg=False,linewidth=2,**kwargs):
+    gb = df.groupby(cols[0:2],group_keys=True)
+
+    if not len(cols) == 4:
+        print("ratio_colorscatter_2d_groupby requires len(cols) == 4")
+        sys.exit()
+
+    # WARNING: hacky solution for selecting colors
+    ncol1 = len(set(df[cols[1]]))
+    if ncol1 > 2:
+        print("second column must store boolean values")
+        sys.exit()
+
+    #color_multiplier = np.linspace(1,0.2,ncol1)
+    marker_dict = {0:"o",1:"X"}
+    def scatter_one(gr,sizenorm_lims):
+        try:
+            gr["temp_barchart_fn"] = f(gr)
+            vals_test = (gr.groupby(cols[2:])["temp_barchart_fn"].mean()).to_frame()
+        except:
+            gb = gr.groupby(cols[2:],group_keys=True)
+            gb_f = gb.apply(f)
+            vals_test = gb_f.apply(lambda x: np.mean(x)).to_frame()
+            vals_test = vals_test.rename({0:"temp_barchart_fn"},axis="columns")
+
+        vals_test = vals_test.reset_index()
+        sizes = np.array(vals_test[cols[2]])
+        if len(sizenorm_lims) == 0:
+            sizenorm_lims = [np.min(sizes),np.max(sizes)]
+
+        if len(set(sizes)) > 1:
+            vals_test = vals_test.reset_index()
+            sizes = (sizes - sizenorm_lims[0])/(sizenorm_lims[1] - sizenorm_lims[0])
+            sizes = sizes*(size_lims[1] - size_lims[0]) + size_lims[0]
+        else:
+            sizes = (size_lims[1] + size_lims[0])/2.0
+
+        label = get_label([cols[0]],to_tuple(gr.name[0]),varnames_dict)
+        color = get_color_from_label(label,mastercolor)
+        #color = color*color_multiplier[gr.name[1]]
+        ax.scatter(vals_test[cols[3]],vals_test["temp_barchart_fn"],s=sizes,color=color,
+                   marker=marker_dict[gr.name[1]],clip_on=False,alpha=markeralpha,edgecolors="k",
+                   label=get_label([cols[1]],to_tuple(gr.name[1]),varnames_dict))
+        if draw_lines:
+            line_gb = vals_test.groupby(cols[2])
+            def plot_one(gr):
+                ax.plot(gr[cols[3]],gr["temp_barchart_fn"],color=color,linewidth=linewidth,
+                        marker="none")
+            line_gb.apply(plot_one)
+            #ax.plot(vals_test[cols[3]],vals_test["temp_barchart_fn"],color=color,linewidth=linewidth,
+                    #marker="none",label=get_label([cols[1]],to_tuple(gr.name[1]),varnames_dict))
+
+    gb.apply(lambda x: scatter_one(x,sizenorm_lims))
+
+    ax.set_xlabel(varnames_dict[cols[3]],fontsize=fontsize)
+    ax.set_xscale("log")
+    ax.set_ylabel(ylabel,fontsize=fontsize)
+    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
+
+    if not suppress_leg:
+        f = lambda m,c: plt.plot([],[],marker=m,color=c,ls="none")[0]
+        markerlabs = [get_label([cols[1]],to_tuple(ii),varnames_dict) for ii in set(df[cols[1]])]
+        colorlabs = [get_label([cols[0]],to_tuple(ii),varnames_dict) for ii in set(df[cols[0]])]
+
+        handles = [f(marker_dict[ii],"k") for ii in set(df[cols[1]])]
+        handles += [mpl.lines.Line2D([0],[0],color=get_color_from_label(x,mastercolor),lw=linewidth)
+                    for x in colorlabs]
+
+        ax.legend(handles,markerlabs + colorlabs,loc="upper right",frameon=False,
+                  markerscale=3.5,handlelength=1)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    if not title == "":
+        ax.set_title(title,fontsize=fontsize)
+
+    if not filename == "":
+        plt.rcParams.update({'font.size':fontsize})
+
+
+def colorplot_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
+                         mastercolor=[1,1,1],colorbar_lims=[],**kwargs):
     if not len(cols) == 2:
         print("ratio_colorplot_2d_groupby requires len(cols) == 2")
         sys.exit()
@@ -569,14 +681,19 @@ def colorplot_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[]):
     l0 = vals_test.index.unique(level=cols[0])
     l1 = vals_test.index.unique(level=cols[1])
 
+    if len(colorbar_lims) == 0:
+        colorbar_lims = [np.min(sizes),np.max(sizes)]
+
     print("Plotting...")
+    custom_cm = mpl.colors.LinearSegmentedColormap.from_list("custom_cm",[[0,0,0],mastercolor])
     ax.imshow(H,interpolation="none",origin="lower",extent=[min(l1),max(l1),min(l0),max(l0)],
-              aspect=(max(l1)-min(l1))/(max(l0)-min(l0)),cmap="coolwarm")
+              aspect=(max(l1)-min(l1))/(max(l0)-min(l0)),cmap=custom_cm,vmin=colorbar_lims[0],
+              vmax=colorbar_lims[1])
 
     for (j,i), label in np.ndenumerate(H):
         j = ((j+0.5)/len(l0))*(max(l0)-min(l0))+min(l0)
         i = ((i+0.5)/len(l1))*(max(l1)-min(l1))+min(l1)
-        ax.text(i,j,f"{label:.3f}",ha="center",va="center")
+        ax.text(i,j,f"{label:.3f}",ha="center",va="center",fontweight="bold",color="w")
 
     yticklocs = ((np.arange(0,H.shape[0])+0.5)/len(l0))*(max(l0)-min(l0))+min(l0)
     xticklocs = ((np.arange(0,H.shape[1])+0.5)/len(l1))*(max(l1)-min(l1))+min(l1)
@@ -702,8 +819,9 @@ def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],yla
         else:
             color = barcolors[ii]
         offset = width*multiplier
-        ax.bar(labelloc+offset,vals[0],width,label=label,color=color)
-        ax.bar(labelloc+offset,vals[1],width,color=(0,0,0),alpha=0.5,label="")
+        ax.bar(labelloc+offset,vals[0],width,label=label,color=color,edgecolor=color)
+        #ax.bar(labelloc+offset,vals[1],width,color=(0,0,0),alpha=0.5,label="")
+        ax.bar(labelloc+offset,vals[1],width,color="none",edgecolor="black",hatch="///")
         multiplier += 1
 
     ax.set_ylabel(ylabel,wrap=True,fontsize=fontsize)
@@ -728,7 +846,8 @@ def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],yla
     ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
     if bbox_to_anchor is None:
         bbox_to_anchor = (0,0,1.0,1.0)
-    lg = ax.legend(loc=legloc,ncol=legncol,bbox_to_anchor=bbox_to_anchor,frameon=False)
+    lg = ax.legend(loc=legloc,ncol=legncol,bbox_to_anchor=bbox_to_anchor,frameon=False,
+                   fontsize=round(LEG_FONT_RATIO*fontsize))
     #lg = ax.legend(loc=legloc,ncol=legncol,frameon=False)
 
     if not ax:
@@ -854,7 +973,8 @@ def bar_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[],ax=
         plt.savefig(filename)
 
 
-def regulator_concentration_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[]):
+def regulator_concentration_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],
+                                    **kwargs):
     gb = df.groupby(cols,group_keys=True)
 
     #nbin = 1000
@@ -895,11 +1015,18 @@ def regulator_concentration_groupby(df,cols,title="",filename="",varnames_dict=[
         plt.savefig(filename)
 
 
-def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[]):
+def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],
+                                   fontsize=24,mastercolor=[1,1,1],**kwargs):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    ncol1 = len(set(df[cols[0]]))
+    cur_color_list = np.linspace(0.2,1,ncol1).reshape(ncol1,1) * np.multiply(mastercolor,np.ones((1,3)))
+    colordict = {}
+    for ii, lab in enumerate(gb.groups.keys()):
+        colordict[lab] = cur_color_list[ii]
 
     def scatter_one(gr):
         target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
@@ -908,23 +1035,35 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[]
 
         labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
-        ax.plot(target_pattern_vals,cur_total_error_frac,'o',ms=5,alpha=0.2,label=labtext)
-        target_pattern_vals_on = manage_db.logical_ix(target_pattern_vals,target_pattern_vals > 0)
-        ax.set_xlim(np.min(target_pattern_vals_on),np.max(target_pattern_vals_on))
+        ax.plot(target_pattern_vals,cur_total_error_frac,'o',ms=5,alpha=0.2,label=labtext,
+                color=colordict[gr.name])
+        #target_pattern_vals_on = manage_db.logical_ix(target_pattern_vals,target_pattern_vals > 0)
+        #ax.set_xlim(np.min(target_pattern_vals_on),np.max(target_pattern_vals_on))
 
     gb.apply(scatter_one)
 
     ax.set_xlabel("target expression level")
-    ax.set_ylabel("total error fraction")
+    ax.set_ylabel("total nontarget contribution")
+    ax.set_xlim(0,1)
     ax.set_ylim(0,1)
-    lg = ax.legend(loc="upper right",markerscale=10)
+    ax.set_xticks([0,0.5,1])
+    ax.set_yticks([0.5,1])
 
-    for lgh in lg.get_lines():
-        lgh.set_alpha(1)
-        lgh.set_marker('.')
+    cur_cmap = mpl.colors.ListedColormap(cur_color_list)
+    cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cur_cmap),ax=ax,location='top')
+    cb.ax.get_xaxis().set_ticks([])
+    for j, lab in enumerate(gb.groups.keys()):
+        cur_label = f"{lab:.0f}"
+        cb.ax.text((2*j+1)/10.0,0.45,cur_label,ha='center',va='center',color='white',fontweight='bold')
+    cb.ax.get_xaxis().labelpad = 15
+    try:
+        cb.ax.set_xlabel(varnames_dict[cols[0]],fontsize=fontsize)
+    except Exception as e:
+        print(e)
+        pass
 
     if not title == "":
-        ax.set_title(title,wrap=True)
+        ax.set_title(title,wrap=True,x=0.95,y=0.9,fontweight="bold",ha="right",fontsize=fontsize)
     if not filename == "":
         plt.savefig(filename)
 
@@ -982,7 +1121,7 @@ def scatter_expression_factor_groupby(df,cols,title="",filename="",varnames_dict
 
 
 def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
-                                      fontsize=24,**kwargs):
+                                      fontsize=24,colorbar_leg=True,**kwargs):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -991,9 +1130,9 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
     ncol1 = len(set(df[cols[0]]))
     cur_color_list = np.linspace(0.2,1,ncol1).reshape(ncol1,1) * np.multiply(mastercolor,np.ones((1,3)))
     colordict = {}
-    for i, lab in enumerate(gb.groups.keys()):
-        colordict[lab] = cur_color_list[i]
-    #ax.set_prop_cycle(color=cur_color_list)
+    for ii, lab in enumerate(gb.groups.keys()):
+        colordict[lab] = cur_color_list[ii]
+
     def scatter_one(gr):
         target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
         actual_expression = np.array(gr["output_expression"].to_list()).flatten()
@@ -1006,35 +1145,37 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
         ax.plot(0,np.mean(manage_db.logical_ix(actual_expression,target_pattern_vals == 0)),
                    color=colordict[gr.name],marker='X',markersize=20,clip_on=False,zorder=10)#,markeredgecolor='k')
 
-        axlower = 0#min(manage_db.logical_ix(target_pattern_vals,target_pattern_vals > 0))
-        axupper = 1#max(target_pattern_vals)
-        ax.set_xlim(axlower,axupper)
-        ax.set_ylim(axlower,axupper)
-        ax.set_xticks([0,0.5,1])
-        ax.set_yticks([0.5,1])
-
     gb.apply(scatter_one)
 
     ax.set_xlabel("target expression level",fontsize=fontsize)
     ax.set_ylabel("actual expression level",fontsize=fontsize)
-    #ax.set_ylim(0,1)
-    #lg = ax.legend(loc="upper left",markerscale=5)
-    #for lgh in lg.get_lines():
-    #    lgh.set_alpha(1)
-    #    lgh.set_marker('.')
+    axlower = 0#min(manage_db.logical_ix(target_pattern_vals,target_pattern_vals > 0))
+    axupper = 1#max(target_pattern_vals)
+    ax.set_xlim(axlower,axupper)
+    ax.set_ylim(axlower,axupper)
+    ax.set_xticks([0,0.5,1])
+    ax.set_yticks([0.5,1])
 
     cur_cmap = mpl.colors.ListedColormap(cur_color_list)
     cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cur_cmap),ax=ax,location='top')
-    #cb.ax.get_yaxis().set_ticks([])
     cb.ax.get_xaxis().set_ticks([])
     for j, lab in enumerate(gb.groups.keys()):
         cur_label = f"{lab:.0f}"
-        #cb.ax.text(0.5,(2*j+1)/10.0,cur_label,ha='center',va='center')
         cb.ax.text((2*j+1)/10.0,0.45,cur_label,ha='center',va='center',color='white',fontweight='bold')
-    #cb.ax.get_yaxis().labelpad = 15
-    #cb.ax.set_ylabel('intrinsic specificity',rotation=270)
     cb.ax.get_xaxis().labelpad = 15
-    cb.ax.set_xlabel('intrinsic specificity',fontsize=fontsize)
+    try:
+        cb.ax.set_xlabel(varnames_dict[cols[0]],fontsize=fontsize)
+    except Exception as e:
+        print(e)
+        pass
+
+    if not colorbar_leg:
+        lg = ax.legend(loc="upper center",markerscale=5,frameon=False,
+                       bbox_to_anchor=(0.5,1.17))
+        for lgh in lg.get_lines():
+            lgh.set_alpha(1)
+            lgh.set_marker('.')
+        cb.remove()
 
     ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
 
@@ -1160,7 +1301,7 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[],varnames_dic
     ax.scatter(modulating_concentration_vals,target_pattern_vals,color=0.5*mastercolor,s=10,alpha=0.5,
                label="optimized target TF")
 
-    ax.set_xlabel("concentration",fontsize=fontsize)
+    ax.set_xlabel("target TF concentration",fontsize=fontsize)
     ax.set_ylabel("target expression level",fontsize=fontsize)
     #ax.set_xlim(0,min(100,max([max(optimized_input_vals),max(modulating_concentration_vals)])))
     ax.set_xscale('log')
@@ -1171,7 +1312,7 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[],varnames_dic
     if not title == "":
         ax.set_title(title,wrap=True,x=0.05,y=0.92,fontweight='bold',ha="left",fontsize=fontsize)
 
-    lg = ax.legend(markerscale=5,frameon=False,handlelength=1,fontsize=round(0.6*fontsize),
+    lg = ax.legend(markerscale=5,frameon=False,handlelength=1,fontsize=round(LEG_FONT_RATIO*fontsize),
                    loc="lower right")
 
     for lgh in lg.legendHandles:
@@ -1183,6 +1324,9 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[],varnames_dic
 
 
 def dill_load_as_dict(df,filename):
+    if df["layer2_repressors"].any():
+        print("dill_load_as_dict currently not supported for layer2_repressors = True")
+        sys.exit()
     db_folders = df["filename"].apply(os.path.dirname)
     db_folders = db_folders.unique()
     return dict(zip(db_folders,list(map(lambda x: dill.load(open(os.path.join(x,filename),"rb")),db_folders))))
@@ -1219,46 +1363,48 @@ def calc_modulating_concentrations(df):
     def objective_fn(f,c_NS,c_S,target):
         return f(c_NS+c_S,c_S) - target
 
-    tf_chrom_equiv_pr_bound = dill_load_as_dict(df,"tf_chrom_equiv_pr_bound.out")
-    kpr_pr_open = dill_load_as_dict(df,"kpr_pr_open.out")
-    tf_pr_bound = dill_load_as_dict(df,"tf_pr_bound.out")
+    if not layer2_repressors:
+        tf_chrom_equiv_pr_bound = dill_load_as_dict(df,"tf_chrom_equiv_pr_bound.out")
+        kpr_pr_open = dill_load_as_dict(df,"kpr_pr_open.out")
+        tf_pr_bound = dill_load_as_dict(df,"tf_pr_bound.out")
 
-    print("Calculating modulating concentrations...")
-    def calc_one_row(row):
-        if np.isnan(row["modulating_concentrations"]).any():
-            db_folder = os.path.dirname(row.filename)
-            print(".",end="",flush=True)
+        print("Calculating modulating concentrations...")
+        def calc_one_row(row):
+            if np.isnan(row["modulating_concentrations"]).any():
+                db_folder = os.path.dirname(row.filename)
+                print(".",end="",flush=True)
 
-            crosstalk_metric = manage_db.get_crosstalk_metric_from_row(row)
+                crosstalk_metric = manage_db.get_crosstalk_metric_from_row(row)
 
-            modulating_concentrations = np.zeros(len(row["target_pattern"]))
-            error_metric_post_modulation = np.zeros(len(row["target_pattern"]))
-            layer1_concentrations = row["optimized_input"][:int(row["N_PF"])]
-            tf_concentrations = row["optimized_input"][int(row["N_PF"]):]
-            for ii_gene, target_level in enumerate(row["target_pattern"]):
-                if True:#target_level > 0:
-                    if row["tf_first_layer"]: # b/c crosslayer crosstalk permitted
-                        cur_noncognate_concentrations = np.sum(row["optimized_input"]) - tf_concentrations[ii_gene]
-                        noncognate_for_layer1 = cur_noncognate_concentrations
-                        layer1_pr_on = tf_chrom_equiv_pr_bound[db_folder]
-                    else:
-                        layer1_pr_on = kpr_pr_open[db_folder]
-                        cur_noncognate_concentrations = np.sum(tf_concentrations) - tf_concentrations[ii_gene]
-                        noncognate_for_layer1 = np.sum(layer1_concentrations)
+                modulating_concentrations = np.zeros(len(row["target_pattern"]))
+                error_metric_post_modulation = np.zeros(len(row["target_pattern"]))
+                layer1_concentrations = row["optimized_input"][:int(row["N_PF"])]
+                tf_concentrations = row["optimized_input"][int(row["N_PF"]):]
+                for ii_gene, target_level in enumerate(row["target_pattern"]):
+                    if True:#target_level > 0:
+                        if row["tf_first_layer"]: # b/c crosslayer crosstalk permitted
+                            cur_noncognate_concentrations = np.sum(row["optimized_input"]) - tf_concentrations[ii_gene]
+                            noncognate_for_layer1 = cur_noncognate_concentrations
+                            layer1_pr_on = tf_chrom_equiv_pr_bound[db_folder]
+                        else:
+                            layer1_pr_on = kpr_pr_open[db_folder]
+                            cur_noncognate_concentrations = np.sum(tf_concentrations) - tf_concentrations[ii_gene]
+                            noncognate_for_layer1 = np.sum(layer1_concentrations)
 
-                    layer1_probabilities = np.array(row["R"]).dot(layer1_pr_on(noncognate_for_layer1,layer1_concentrations))
-                    target_corrected_for_layer1 = np.divide(row["target_pattern"],layer1_probabilities)
+                        layer1_probabilities = np.array(row["R"]).dot(layer1_pr_on(noncognate_for_layer1,layer1_concentrations))
+                        target_corrected_for_layer1 = np.divide(row["target_pattern"],layer1_probabilities)
 
-                    modulating_concentrations[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(tf_pr_bound[db_folder],cur_noncognate_concentrations,x,target_corrected_for_layer1[ii_gene]),tf_concentrations[ii_gene])
+                        modulating_concentrations[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(tf_pr_bound[db_folder],cur_noncognate_concentrations,x,target_corrected_for_layer1[ii_gene]),tf_concentrations[ii_gene])
 
-                    tf_concentrations_with_ii_modulated = tf_concentrations.copy()
-                    tf_concentrations_with_ii_modulated[ii_gene] = modulating_concentrations[ii_gene]
-                    error_metric_post_modulation[ii_gene] = crosstalk_metric(row["target_pattern"], \
-                            layer1_concentrations,tf_concentrations_with_ii_modulated)
+                        tf_concentrations_with_ii_modulated = tf_concentrations.copy()
+                        tf_concentrations_with_ii_modulated[ii_gene] = modulating_concentrations[ii_gene]
+                        error_metric_post_modulation[ii_gene] = crosstalk_metric(row["target_pattern"], \
+                                layer1_concentrations,tf_concentrations_with_ii_modulated)
 
-            row["modulating_concentrations"] = np.array(modulating_concentrations)
-            row["error_metric_post_modulation"] = np.array(error_metric_post_modulation)
-        return row
+                row["modulating_concentrations"] = np.array(modulating_concentrations)
+                row["error_metric_post_modulation"] = np.array(error_metric_post_modulation)
+            return row
 
-
-    return df.parallel_apply(calc_one_row,axis=1)
+        return df.parallel_apply(calc_one_row,axis=1)
+    else:
+        return df

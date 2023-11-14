@@ -62,7 +62,7 @@ def main(argv):
         shutil.copy("src/params.py",os.path.join(output_folder,"params.py"))
     
     # choose parameters before calculating
-    sym.var('C c_S',real=True)
+    sym.var('C c_S C_A c_A C_R c_R',real=True)
 
 
     print("Generating models...")
@@ -70,22 +70,38 @@ def main(argv):
     ## --- TF BINDING --- ##
     # assume single cluster with single site
     print("  Generating TF binding models...")
-
-    # "normal" model (with K_NS, K_S in params.py)
-    tf_pr_bound = sym.lambdify((C,c_S),(1 - 1/(c_S/K_S + (C-c_S)/K_NS + 1)),"numpy")
-    tf_error_rate = sym.lambdify((C,c_S),((C-c_S)/K_NS)/((C-c_S)/K_NS + c_S/K_S),"numpy")
-
-    dill.dump(tf_pr_bound, open(os.path.join(output_folder,"tf_pr_bound.out"),"wb"))
-    dill.dump(tf_error_rate, open(os.path.join(output_folder,"tf_error_rate.out"),"wb"))
-              
-    # chromatin equivalent model
+    # for use in chromatin equivalent model
     K_NS_pfeq = kh_NSm/kh_NSp
     K_S_pfeq = kh_Sm/kh_Sp
 
-    tf_chrom_equiv_pr_bound = sym.lambdify((C,c_S),(1 - 1/(c_S/K_S_pfeq + (C-c_S)/K_NS_pfeq + 1)),"numpy")
-    tf_chrom_equiv_error_rate = sym.lambdify((C,c_S),((C-c_S)/K_NS_pfeq)/((C-c_S)/K_NS_pfeq + c_S/K_S_pfeq),"numpy")
+    if not layer2_repressors:
+        # "normal" model (with K_NS, K_S in params.py)
+        tf_pr_bound = sym.lambdify((C,c_S),(1 - 1/(c_S/K_S + (C-c_S)/K_NS + 1)),"numpy")
+        tf_error_rate = sym.lambdify((C,c_S),((C-c_S)/K_NS)/((C-c_S)/K_NS + c_S/K_S),"numpy")
+              
+        tf_chrom_equiv_pr_bound = sym.lambdify((C,c_S),(1 - 1/(c_S/K_S_pfeq + (C-c_S)/K_NS_pfeq + 1)),"numpy")
+        tf_chrom_equiv_error_rate = sym.lambdify((C,c_S),((C-c_S)/K_NS_pfeq)/((C-c_S)/K_NS_pfeq + c_S/K_S_pfeq),"numpy")
+    else:
+        ## --- TF WITH REPRESSOR --- ##
+        # TODO: fix error rates
+        # C_R = total concentration of repressor
+        # c_R = concentration of target repressor
+        tf_chrom_equiv_pr_bound = sym.lambdify((C,c_S,C_R), \
+                (1 - (1 + C_R/K_NS_pfeq)/(C_R/K_NS_pfeq + c_S/K_S_pfeq + (C-c_S)/K_NS_pfeq + 1)),"numpy")
+        tf_chrom_equiv_error_rate = sym.lambdify((C_A,c_A,C_R,c_R),1,"numpy")
+
+        tf_pr_bound = sym.lambdify((C_A,c_A,C_R,c_R), \
+                (c_A/K_S + (C_A-c_A)/K_NS + C_A/K_NS + (C_A/K_NS)*(c_A/K_S) + (C_A/K_NS)*((C_A-c_A)/K_NS)) / \
+                (1 + (c_R/K_S)*(c_A/K_S) + (c_R/K_S)*((C_A-c_A)/K_NS) + ((C_R-c_R)/K_NS)*((C_A-c_A)/K_NS) + \
+                ((C_R-c_R)/K_NS)*(c_A/K_S) + (c_R/K_S) + ((C_R-c_R)/K_NS) + (c_R/K_S)*(C_R/K_NS) + \
+                ((C_R-c_R)/K_NS)*(C_R/K_NS) + (C_A/K_NS)*(C_R/K_NS) + (C_R/K_NS) + \
+                c_A/K_S + (C_A-c_A)/K_NS + C_A/K_NS + (C_A/K_NS)*(c_A/K_S) + (C_A/K_NS)*((C_A-c_A)/K_NS)), \
+                "numpy")
+        tf_error_rate = sym.lambdify((C_A,c_A,C_R,c_R),1,"numpy")
 
     dill.dump(tf_chrom_equiv_pr_bound, open(os.path.join(output_folder,"tf_chrom_equiv_pr_bound.out"),"wb"))
+    dill.dump(tf_pr_bound, open(os.path.join(output_folder,"tf_pr_bound.out"),"wb"))
+    dill.dump(tf_error_rate, open(os.path.join(output_folder,"tf_error_rate.out"),"wb"))
     dill.dump(tf_chrom_equiv_error_rate, open(os.path.join(output_folder,"tf_chrom_equiv_error_rate.out"),"wb"))
     
 
