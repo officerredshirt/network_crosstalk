@@ -40,8 +40,8 @@ MIN_EXPRESSION = 0.3    # minimum expression level for a gene in a target patter
 MAX_EXPRESSION = 0.9    # maximum expression level for a gene in a target pattern
 
 # OPTIMIZATION
-ignore_off_during_optimization = True   # True if ignore errors from OFF genes during optimization
-concentration_penalty = False;  # True if apply penalty for high concentrations during optimization
+ignore_off_during_optimization = False   # True if ignore errors from OFF genes during optimization
+concentration_penalty = False  # True if apply penalty for high concentrations during optimization
 cp = 1e-1
 eps = 1e-10
 

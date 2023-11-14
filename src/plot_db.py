@@ -28,6 +28,7 @@ def get_varname_to_value_dict(df):
     
     varname_to_value = {}
     for var in varname_dict.keys():
+        print(var)
         possible_values = set(df[var])
         key_val_pairs = list(zip(itertools.repeat(var),possible_values))
         labels_per_key = [f"{varname_dict[x[0]]} = {int(x[1])}" for x in key_val_pairs]
@@ -1324,9 +1325,6 @@ def scatter_modulating_concentrations(df,title="",filename="",ax=[],varnames_dic
 
 
 def dill_load_as_dict(df,filename):
-    if df["layer2_repressors"].any():
-        print("dill_load_as_dict currently not supported for layer2_repressors = True")
-        sys.exit()
     db_folders = df["filename"].apply(os.path.dirname)
     db_folders = db_folders.unique()
     return dict(zip(db_folders,list(map(lambda x: dill.load(open(os.path.join(x,filename),"rb")),db_folders))))

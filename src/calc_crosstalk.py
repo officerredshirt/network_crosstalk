@@ -100,30 +100,29 @@ def main(argv):
             c_0 = array([10]*(N_PF_to_use + N_TF_to_use))
             #c_0[cur_input] = 10 
 
-            try:
-                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
-                                           method = "L-BFGS-B", options = {"maxfun":1000000})
+            #try:
+            optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
+                                       method = "L-BFGS-B", options = {"maxfun":1000000})
 
-                if (not target_independent_of_clusters) and (not layer2_repressors):
-                    optres.x = concatenate((optres.x[0:N_PF_to_use],zeros(N_PF - N_PF_to_use),
-                                           optres.x[N_PF_to_use:],zeros(N_TF - N_TF_to_use)))
+            if (not target_independent_of_clusters) and (not layer2_repressors):
+                optres.x = concatenate((optres.x[0:N_PF_to_use],zeros(N_PF - N_PF_to_use),
+                                       optres.x[N_PF_to_use:],zeros(N_TF - N_TF_to_use)))
 
-                if ignore_off_during_optimization:
-                    # store actual error even though optimization itself ignores OFF genes
-                    optres.f = crosstalk_metric(target_pattern, \
-                            optres.x[0:N_PF],optres.x[N_PF:])
-                output_expression = crosstalk_metric([], \
-                        optres.x[0:N_PF],optres.x[N_PF:], \
-                        return_var="gene_exp")
-                output_error = crosstalk_metric([], \
-                        optres.x[0:N_PF],optres.x[N_PF:], \
-                        return_var="error_frac")
-                max_expression = crosstalk_metric([],[],[],return_var="max_expression")
-                manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression)
-                print("! ",end="",flush=True)
-            except Exception as e:
-                print(f"optimization error \"{e}\"; skipping...")
-                #pass
+            if ignore_off_during_optimization:
+                # store actual error even though optimization itself ignores OFF genes
+                optres.f = crosstalk_metric(target_pattern, \
+                        optres.x[0:N_PF],optres.x[N_PF:])
+            output_expression = crosstalk_metric([], \
+                    optres.x[0:N_PF],optres.x[N_PF:], \
+                    return_var="gene_exp")
+            output_error = crosstalk_metric([], \
+                    optres.x[0:N_PF],optres.x[N_PF:], \
+                    return_var="error_frac")
+            max_expression = crosstalk_metric([],[],[],return_var="max_expression")
+            manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression)
+            print("! ",end="",flush=True)
+            #except Exception as e:
+                #print(f"optimization error \"{e}\"; skipping...")
 
     with Pool() as pool:
         pool.map(optim,target_patterns[0:npatterns])
