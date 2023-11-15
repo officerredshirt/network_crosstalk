@@ -26,13 +26,23 @@ def main(argv):
 
     df = plot_db.combine_databases([database])
     varnames_dict = plot_db.get_varname_to_value_dict(df)
-    fig, ax = plt.subplots(1,1,figsize=(24,24))
+    fntsz=36
+    fig, ax = plt.subplots(1,2,figsize=(24,12))
     plot_db.subplots_groupby(df,
                              "M_GENE",
                              [],[],
                              plot_db.scatter_target_expression_groupby,
                              ["ratio_KNS_KS"],
-                             ax=[ax],varnames_dict=varnames_dict)
+                             ax=[ax[0]],fontsize=fntsz,
+                             varnames_dict=varnames_dict)
+    plot_db.subplots_groupby(df,
+                             "M_GENE",
+                             [],[],
+                             plot_db.scatter_repressor_activator,
+                             ["ratio_KNS_KS"],
+                             ax=[ax[1]],fontsize=fntsz,
+                             varnames_dict=varnames_dict)
+
     plt.savefig("../testing.png")
     plt.close()
 

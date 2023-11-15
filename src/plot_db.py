@@ -28,7 +28,6 @@ def get_varname_to_value_dict(df):
     
     varname_to_value = {}
     for var in varname_dict.keys():
-        print(var)
         possible_values = set(df[var])
         key_val_pairs = list(zip(itertools.repeat(var),possible_values))
         labels_per_key = [f"{varname_dict[x[0]]} = {int(x[1])}" for x in key_val_pairs]
@@ -1185,6 +1184,49 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
     if not filename == "":
         plt.savefig(filename)
 
+
+def scatter_repressor_activator(df,cols,title="",filename="",ax=(),fontsize=24,varnames_dict=[],**kwargs):
+    df = df.loc[df["layer2_repressors"] == True]
+    if len(df) == 0:
+        print("error: no entries found with layer2_repressors = True")
+        sys.exit()
+
+    gb = df.groupby(cols,group_keys=True)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(24,24))
+
+    def get_concentrations_per_row(row):
+        cur_conc = np.array(row["optimized_input"])
+        return cur_conc[row["N_PF"]:]
+
+    def scatter_one(gr):
+        target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
+        concentration_vals = np.array(gr[["N_PF","optimized_input"]].parallel_apply(get_concentrations_per_row,axis=1).to_list())
+        
+        activator_vals = np.array(list(map(lambda x: x[0:int(len(x)/2)],concentration_vals))).flatten()
+        repressor_vals = np.array(list(map(lambda x: x[int(len(x)/2):],concentration_vals))).flatten()
+
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
+
+        #ax.scatter(target_pattern_vals,activator_vals/(activator_vals+repressor_vals),s=10,label=labtext)
+        ax.scatter(target_pattern_vals,activator_vals,s=20,color="g",label=labtext)
+        ax.scatter(target_pattern_vals,repressor_vals,s=20,color="r",label=labtext)
+        plt.rcParams.update({'font.size':fontsize})
+        plt.rc("legend",fontsize=fontsize)
+
+    gb.apply(scatter_one)
+
+    ax.set_xlabel("target expression level",fontsize=fontsize)
+    #ax.set_ylabel("target activator concentration / total target regulator concentration")
+    ax.set_ylabel("target regulator concentration",fontsize=fontsize)
+    #ax.legend(loc="upper left")
+    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
+
+    if not title == "":
+        ax.set_title(title,wrap=True)
+    if not filename == "":
+        plt.savefig(filename)
 
 def scatter_patterning_residuals_groupby(df,cols,title="",filename="",ax=(),fontsize=24,varnames_dict=[]):
     gb = df.groupby(cols,group_keys=True)
