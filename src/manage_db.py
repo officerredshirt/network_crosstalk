@@ -609,17 +609,24 @@ def xtalk_result_found(db_filename,network_rowid,minimize_noncognate_binding,tf_
     con = sqlite3.connect(db_filename)
     cur = con.cursor()
 
-    res_table = cur.execute(f"SELECT target_pattern FROM xtalk WHERE network_rowid = {network_rowid} AND minimize_noncognate_binding = {minimize_noncognate_binding} AND tf_first_layer = {tf_first_layer}").fetchall()
+    res_table = cur.execute(f"SELECT target_pattern, success FROM xtalk WHERE network_rowid = {network_rowid} AND minimize_noncognate_binding = {minimize_noncognate_binding} AND tf_first_layer = {tf_first_layer}").fetchall()
 
     con.commit()
     con.close()
 
-    patterns_already_evaluated = [np.frombuffer(x[0]) for x in res_table]
+    patterns_already_evaluated = [np.frombuffer(x[0]) for x in res_table[0]]
 
     if len(patterns_already_evaluated) > 0:
-        return any([np.array_equal(target_pattern,x) for x in patterns_already_evaluated])
+        equal = [np.array_equal(target_pattern,x) for x in patterns_already_evaluated]
+        found = any(equal)
+        if found:
+            success = [x[1] for x in res_table]
+            success = any(logical_ix(success,equal))
+        else:
+            success = False
+        return found, success
     else:
-        return False
+        return False, False
 
 
 # Query the database.

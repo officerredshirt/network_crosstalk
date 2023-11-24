@@ -37,6 +37,7 @@ def main(argv):
     parser.add_argument("-t","--tf_first_layer",action="store_true",default=False)
     parser.add_argument("-c","--minimize_noncognate_binding",action="store_true",default=False)
     parser.add_argument("-s","--suppress_filesave",action="store_true",default=False)
+    parser.add_argument("-r","--redo_unsuccessful",action="store_true",default=False)
 
     args = parser.parse_args()
     filename_in = args.filename_in
@@ -47,6 +48,7 @@ def main(argv):
     minimize_noncognate_binding = args.minimize_noncognate_binding
     model_folder = args.model_folder
     suppress_filesave = args.suppress_filesave
+    redo_unsuccessful = args.redo_unsuccessful
     
     local_id = manage_db.extract_local_id(filename_in)
 
@@ -94,7 +96,9 @@ def main(argv):
 
         bnds = [(0,inf)]*(N_PF_to_use + N_TF_to_use)    # force concentrations positive
 
-        if not(manage_db.xtalk_result_found(database,local_id,int(minimize_noncognate_binding),int(tf_first_layer),target_pattern)):
+        result_found, result_success = manage_db.xtalk_result_found(database,local_id,int(minimize_noncognate_binding),int(tf_first_layer),target_pattern)
+
+        if (not result_found) or (redo_unsuccessful and not result_success):
             print(".",end="",flush=True)
             # starting point
             c_0 = array([10]*(N_PF_to_use + N_TF_to_use))
@@ -119,6 +123,7 @@ def main(argv):
                     optres.x[0:N_PF],optres.x[N_PF:], \
                     return_var="error_frac")
             max_expression = crosstalk_metric([],[],[],return_var="max_expression")
+
             manage_db.add_xtalk(database,local_id,minimize_noncognate_binding,crosslayer_crosstalk,tf_first_layer,target_pattern,optres,output_expression,output_error,max_expression)
             print("! ",end="",flush=True)
             #except Exception as e:
