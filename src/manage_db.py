@@ -614,7 +614,7 @@ def xtalk_result_found(db_filename,network_rowid,minimize_noncognate_binding,tf_
     con.commit()
     con.close()
 
-    patterns_already_evaluated = [np.frombuffer(x[0]) for x in res_table[0]]
+    patterns_already_evaluated = [np.frombuffer(x[0]) for x in res_table]
 
     if len(patterns_already_evaluated) > 0:
         equal = [np.array_equal(target_pattern,x) for x in patterns_already_evaluated]
