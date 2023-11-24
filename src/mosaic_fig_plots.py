@@ -56,7 +56,8 @@ def main(argv):
                (df["MIN_EXPRESSION"] < 0.3)]
     
     df_normal = df.loc[(df["ignore_off_during_optimization"] == False) &
-                (df["target_independent_of_clusters"] == False)]
+                (df["target_independent_of_clusters"] == False) &
+                (df["layer2_repressors"] == False)]
 
     varnames_dict = plot_db.get_varname_to_value_dict(df)
 
@@ -128,7 +129,8 @@ def main(argv):
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df["M_GENE"] == m_gene) &
-                                        (df["target_independent_of_clusters"] == 0)],
+                                        (df["target_independent_of_clusters"] == 0) &
+                                        (df["layer2_repressors"] == 0)],
                                  ["ratio_KNS_KS"],
                                  [],[],
                                  plot_db.rms_barchart_groupby,

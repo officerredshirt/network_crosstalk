@@ -13,12 +13,12 @@ def main(argv):
             prog = "add_col_to_hdf",
             description = "",
             epilog = "")
-    parser.add_argument("hdf_filename",nargs='*')
+    parser.add_argument("hdf_filename")
 
     args = parser.parse_args()
-    hdf_filenmae = args.hdf_filename
+    hdf_filename = args.hdf_filename
 
-    hdf_filename = "../combined_res.hdf"
+    #hdf_filename = "../combined_res.hdf"
 
     if os.path.exists(hdf_filename):
         df = pandas.read_hdf(hdf_filename,key="df")

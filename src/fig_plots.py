@@ -56,7 +56,8 @@ def main(argv):
                (df["MIN_EXPRESSION"] < 0.3)]
     
     df_normal = df.loc[(df["ignore_off_during_optimization"] == False) &
-                (df["target_independent_of_clusters"] == False)]
+                (df["target_independent_of_clusters"] == False) &
+                (df["layer2_repressors"] == False)]
 
     varnames_dict = plot_db.get_varname_to_value_dict(df)
 
@@ -282,6 +283,7 @@ def main(argv):
                                  ax=ax[0][2:],fontsize=fntsz,
                                  varnames_dict=varnames_dict,
                                  colorbar_lims=[0.6,0.8])
+        """
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
                                                (df_normal["ratio_KNS_KS"] == 1000)],
@@ -289,10 +291,34 @@ def main(argv):
                                  [],[],
                                  plot_db.rms_barchart_groupby,
                                  ["M_GENE","tf_first_layer"],
-                                 ax=ax[1][0:],
-                                 legloc="right",
+                                 ax=ax[1][0:],suppress_leg=True,
+                                 #legloc="right",
                                  fontsize=fntsz,ylabel="global expression error",
                                  varnames_dict=varnames_dict)
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
+                                               (df_normal["ratio_KNS_KS"] == 1000)],
+                                 ["MAX_CLUSTERS_ACTIVE"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["M_GENE","tf_first_layer"],
+                                 ax=ax[0][0:],suppress_leg=True,total_error=True,
+                                 #legloc="right",
+                                 fontsize=fntsz,ylabel="M*(global expression error)^2",
+                                 varnames_dict=varnames_dict)
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
+                                               (df_normal["ratio_KNS_KS"] == 1000)],
+                                 ["MAX_CLUSTERS_ACTIVE"],
+                                 [],[],
+                                 plot_db.rms_scatter_groupby,
+                                 ["M_GENE","tf_first_layer"],
+                                 ax=ax[2][0:],suppress_leg=True,total_error=True,
+                                 #legloc="right",
+                                 fontsize=fntsz,ylabel="M*(global expression error)^2",
+                                 varnames_dict=varnames_dict)
+        
+        """
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000)],
                                  ["ratio_KNS_KS"],
@@ -327,14 +353,14 @@ def main(argv):
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                         (df["M_GENE"] == m_gene) &
-                                        (df["target_independent_of_clusters"] == 0)],
+                                        (df["target_independent_of_clusters"] == 0) &
+                                        (df["layer2_repressors"] == 0)],
                                  ["ignore_off_during_optimization"],
                                  [],[],
                                  plot_db.regulator_concentration_groupby,
                                  ["tf_first_layer"],
                                  ax=ax[3][0:],fontsize=fntsz,
                                  varnames_dict=varnames_dict)
-        """
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["tf_first_layer"] == 0) &
                                         (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
@@ -348,6 +374,7 @@ def main(argv):
                                  subtitles=[""],fontsize=insetfntsz,#linewidth=2,markersize=10,
                                  yticks=[0.1,0.3,0.5],
                                  varnames_dict=varnames_dict)
+        """
     
         fig.tight_layout()
         plt.savefig("../plots/fig/test.png")
