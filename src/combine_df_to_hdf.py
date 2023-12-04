@@ -41,10 +41,13 @@ def main(argv):
         df = plot_db.combine_databases(db_filenames)
     df = df.loc[df["K_NS"] > 100]
     df = df.loc[df["success"] == 1]
-    df = df.loc[df.loc[:,df.columns != "filename"].astype(str).drop_duplicates().index]
+    ix_to_drop = df.loc[:,df.columns != "filename"].astype(str).drop_duplicates().index
+    print(f"Dropping {len(df)-len(ix_to_drop)} duplicate indices...")
+    df = df.loc[ix_to_drop]
     df = plot_db.calc_modulating_concentrations(df)
 
-    df.to_hdf(COMBINED_RESULTS,key="df",mode="w")
+    print("Saving...")
+    df.to_hdf(COMBINED_RESULTS,key="df",mode="w",complevel=9)
     print(df)
 
 

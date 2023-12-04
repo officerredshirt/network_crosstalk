@@ -21,7 +21,7 @@ def main(argv):
     #hdf_filename = "../combined_res.hdf"
 
     if os.path.exists(hdf_filename):
-        df = pandas.read_hdf(hdf_filename,key="df")
+        df = pandas.read_hdf(hdf_filename,key="df",mode="r")
         #df["ratio_KNS_KS"] = df["K_NS"]/df["K_S"]
         #df["layer1_static"] = True
         #df["ignore_off_during_optimization"] = 0
@@ -42,7 +42,7 @@ def main(argv):
         print(f"error: nonexistent hdf file {hdf_filename}")
         return
 
-    df.to_hdf(hdf_filename,key="df",mode="w")
+    df.to_hdf(hdf_filename,key="df",mode="w",complevel=9)
     print(df)
 
 

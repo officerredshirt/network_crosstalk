@@ -582,11 +582,14 @@ def get_color_from_label(label,mastercolor):
         color = mastercolor
     return color
 
+def static_columns(vals,cols):
+    return vals
 
 def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
                             mastercolor=[1,1,1],sizenorm_lims=[],size_lims=[500,2000],
                             ylabel=[],fontsize=24,draw_lines=False,markeralpha=0.6,
                             suppress_leg=False,linewidth=2,normalize=False,
+                            transform_columns=static_columns,
                             logfit=False,**kwargs):
     gb = df.groupby(cols[0:2],group_keys=True)
 
@@ -613,6 +616,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
             vals_test = vals_test.rename({0:"temp_barchart_fn"},axis="columns")
 
         vals_test = vals_test.reset_index()
+        vals_test = transform_columns(vals_test,cols)
         if normalize:
             vals_test["temp_barchart_fn"] = vals_test["temp_barchart_fn"] / \
                     np.min(vals_test["temp_barchart_fn"])
@@ -620,8 +624,8 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         if len(sizenorm_lims) == 0:
             sizenorm_lims = [np.min(sizes),np.max(sizes)]
 
+        vals_test = vals_test.reset_index()
         if len(set(sizes)) > 1:
-            vals_test = vals_test.reset_index()
             sizes = (sizes - sizenorm_lims[0])/(sizenorm_lims[1] - sizenorm_lims[0])
             sizes = sizes*(size_lims[1] - size_lims[0]) + size_lims[0]
         else:
@@ -630,6 +634,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         label = get_label([cols[0]],to_tuple(gr.name[0]),varnames_dict)
         color = get_color_from_label(label,mastercolor)
         #color = color*color_multiplier[gr.name[1]]
+
         ax.scatter(vals_test[cols[3]],vals_test["temp_barchart_fn"],s=sizes,color=color,
                    marker=marker_dict[gr.name[1]],clip_on=False,alpha=markeralpha,edgecolors="k",
                    label=get_label([cols[1]],to_tuple(gr.name[1]),varnames_dict))
