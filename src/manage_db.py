@@ -656,6 +656,51 @@ def print_res(db_filename,table,form="short"):
     return 0
 
 
+# Partitions pattern table into N chunks, each saved into
+# its own folder in folder_out alongside a copy of the
+# parameter and network tables.  Intended for breaking
+# down existing databases to run in multiple jobs on the
+# cluster.
+def partition_database(db_filename,N,folder_out):
+    check_db_exists(db_filename)
+
+    con = sqlite3.connect(db_filename)
+    cur = con.cursor()
+
+    parameters = cur.execute("SELECT * FROM parameters").fetchall()
+    networks = cur.execute("SELECT * FROM networks").fetchall()
+    patterns = cur.execute("SELECT * FROM patterns").fetchall()
+
+    con.close()
+
+    if not os.path.exists(folder_out):
+        os.mkdir(folder_out)
+
+    indices_split = np.array_split(np.arange(0,len(patterns)),N)
+    for ii_partition in range(len(indices_split)):
+        cur_db_out = os.path.join(folder_out,f"job{ii_partition}","res","local_db.db")
+        if not os.path.exists(cur_db_out):
+            os.mkdir(os.path.join(folder_out,f"job{ii_partition}"))
+            os.mkdir(os.path.join(folder_out,f"job{ii_partition}","res"))
+
+        if not os.path.exists(cur_db_out):
+            init_tables(cur_db_out)
+        else:
+            print(f"warning: overwriting existing {cur_db_out}")
+
+        db_child = sqlite3.connect(cur_db_out)
+        child_cur = db_child.cursor()
+
+        child_cur.executemany("INSERT INTO parameters VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",parameters)
+        child_cur.executemany("INSERT INTO networks VALUES(?,?,?,?,?)",networks)
+
+        cur_patterns = [patterns[x] for x in indices_split[ii_partition]]
+        child_cur.executemany("INSERT INTO patterns VALUES(?,?,?)",list(cur_patterns))
+
+        db_child.commit()
+        db_child.close()
+
+
 # append db to the full database db_parent
 def append_db(db_parent_filename,db_filename):
     # reassign parameter_rowid and network_rowid to match default rowid assigned by SQL and
