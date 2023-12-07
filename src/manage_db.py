@@ -733,6 +733,17 @@ def append_db(db_parent_filename,db_filename):
     return 0
 
 
+def get_gradients_from_file(model_folder):
+    gradient_file_list = os.listdir(path=os.path.join(model_folder))
+    gradient_file_list = [x for x in gradient_file_list if "dfd" in x]
+    gradients = {}
+    for file in gradient_file_list:
+        print(os.path.join(model_folder,file))
+        gradients[os.path.splitext(os.path.basename(file))[0]] = \
+                dill.load(open(os.path.join(model_folder,file),"rb"))
+    return gradients
+
+
 def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
         crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder):
     assert N_PF > 0, "get_crosstalk_metric does not support N_PF = 0"

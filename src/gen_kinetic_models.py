@@ -34,7 +34,10 @@ def get_stationary_dist(Q):
 
 def get_pr_open(Pi,x,state_open):
     Pi_open = sum([Pi[x[ii-1,0]] for ii in state_open])
-    return sym.lambdify((C,c_S),Pi_open,"numpy")
+    pr_open = sym.lambdify((C,c_S),Pi_open,"numpy")
+    dfdC = sym.lambdify((C,c_S),sym.diff(Pi_open,C),"numpy")
+    dfdc_S = sym.lambdify((C,c_S),sym.diff(Pi_open,c_S),"numpy")
+    return pr_open, dfdC, dfdc_S
 
 def get_error_rate(Pi,x,corr_state,err_state):
     return sym.lambdify((C,c_S),Pi[x[err_state-1,0]] /
@@ -62,7 +65,7 @@ def main(argv):
         shutil.copy("src/params.py",os.path.join(output_folder,"params.py"))
     
     # choose parameters before calculating
-    sym.var('C c_S C_A c_A C_R c_R',real=True)
+    sym.var('C c_S C_A c_A C_R c_R',positive=True)
 
 
     print("Generating models...")
@@ -86,18 +89,35 @@ def main(argv):
         # TODO: fix error rates
         # C_R = total concentration of repressor
         # c_R = concentration of target repressor
-        tf_chrom_equiv_pr_bound = sym.lambdify((C,c_S,C_R), \
-                (1 - (1 + C_R/K_NS_pfeq)/(C_R/K_NS_pfeq + c_S/K_S_pfeq + (C-c_S)/K_NS_pfeq + 1)),"numpy")
-        tf_chrom_equiv_error_rate = sym.lambdify((C_A,c_A,C_R,c_R),1,"numpy")
+        expr_tf_chrom_equiv_pr_bound = \
+                (1 - (1 + C_R/K_NS_pfeq)/(C_R/K_NS_pfeq + c_S/K_S_pfeq + (C-c_S)/K_NS_pfeq + 1))
+        tf_chrom_equiv_pr_bound = sym.lambdify((C,c_S,C_R), expr_tf_chrom_equiv_pr_bound, "numpy")
+        tf_chrom_equiv_error_rate = sym.lambdify((C,c_S,C_R),1,"numpy")
+        tf_chrom_equiv_dfdC = sym.lambdify((C,c_S,C_R), sym.diff(expr_tf_chrom_equiv_pr_bound,C),"numpy")
+        tf_chrom_equiv_dfdC_R = sym.lambdify((C,c_S,C_R), sym.diff(expr_tf_chrom_equiv_pr_bound,C_R),"numpy")
+        tf_chrom_equiv_dfdc_S = sym.lambdify((C,c_S,C_R), sym.diff(expr_tf_chrom_equiv_pr_bound,c_S),"numpy")
 
-        tf_pr_bound = sym.lambdify((C_A,c_A,C_R,c_R), \
+        dill.dump(tf_chrom_equiv_dfdC, open(os.path.join(output_folder,"tf_chrom_equiv_dfdC.out"),"wb"))
+        dill.dump(tf_chrom_equiv_dfdC_R, open(os.path.join(output_folder,"tf_chrom_equiv_dfdC_R.out"),"wb"))
+        dill.dump(tf_chrom_equiv_dfdc_S, open(os.path.join(output_folder,"tf_chrom_equiv_dfdc_S.out"),"wb"))
+
+        expr_tf_pr_bound =  \
                 (c_A/K_S + (C_A-c_A)/K_NS + C_A/K_NS + (C_A/K_NS)*(c_A/K_S) + (C_A/K_NS)*((C_A-c_A)/K_NS)) / \
                 (1 + (c_R/K_S)*(c_A/K_S) + (c_R/K_S)*((C_A-c_A)/K_NS) + ((C_R-c_R)/K_NS)*((C_A-c_A)/K_NS) + \
                 ((C_R-c_R)/K_NS)*(c_A/K_S) + (c_R/K_S) + ((C_R-c_R)/K_NS) + (c_R/K_S)*(C_R/K_NS) + \
                 ((C_R-c_R)/K_NS)*(C_R/K_NS) + (C_A/K_NS)*(C_R/K_NS) + (C_R/K_NS) + \
-                c_A/K_S + (C_A-c_A)/K_NS + C_A/K_NS + (C_A/K_NS)*(c_A/K_S) + (C_A/K_NS)*((C_A-c_A)/K_NS)), \
-                "numpy")
+                c_A/K_S + (C_A-c_A)/K_NS + C_A/K_NS + (C_A/K_NS)*(c_A/K_S) + (C_A/K_NS)*((C_A-c_A)/K_NS))
+        tf_pr_bound = sym.lambdify((C_A,c_A,C_R,c_R), expr_tf_pr_bound, "numpy")
         tf_error_rate = sym.lambdify((C_A,c_A,C_R,c_R),1,"numpy")
+        tf_dfdC_A = sym.lambdify((C_A,c_A,C_R,c_R),sym.diff(expr_tf_pr_bound,C_A),"numpy")
+        tf_dfdc_A = sym.lambdify((C_A,c_A,C_R,c_R),sym.diff(expr_tf_pr_bound,c_A),"numpy")
+        tf_dfdC_R = sym.lambdify((C_A,c_A,C_R,c_R),sym.diff(expr_tf_pr_bound,C_R),"numpy")
+        tf_dfdc_R = sym.lambdify((C_A,c_A,C_R,c_R),sym.diff(expr_tf_pr_bound,c_R),"numpy")
+
+        dill.dump(tf_dfdC_A, open(os.path.join(output_folder,"tf_dfdC_A.out"),"wb"))
+        dill.dump(tf_dfdc_A, open(os.path.join(output_folder,"tf_dfdc_A.out"),"wb"))
+        dill.dump(tf_dfdC_R, open(os.path.join(output_folder,"tf_dfdC_R.out"),"wb"))
+        dill.dump(tf_dfdc_R, open(os.path.join(output_folder,"tf_dfdc_R.out"),"wb"))
 
     dill.dump(tf_chrom_equiv_pr_bound, open(os.path.join(output_folder,"tf_chrom_equiv_pr_bound.out"),"wb"))
     dill.dump(tf_pr_bound, open(os.path.join(output_folder,"tf_pr_bound.out"),"wb"))
@@ -117,15 +137,17 @@ def main(argv):
     # (4) closed/bound specific (2), (5) closed/bound nonspecific (2), (6) open/unbound
     
     Pi, x = get_stationary_dist(Q)
-    pr_chromatin_open = get_pr_open(Pi,x,[6])
+    pr_chromatin_open, chromatin_dfdC, chromatin_dfdc_S = get_pr_open(Pi,x,[6])
     
     # "error rate" as ratio of rate of transitions to "open" driven by nonspecific vs.
     # specific binding (k_neq cancels out, so equivalent to ratio of probabilities of
     # being in closed/bound (2))
     chromatin_opening_error_rate = get_error_rate(Pi,x,4,5)
-    
+
     dill.dump(pr_chromatin_open, open(os.path.join(output_folder,"kpr_pr_open.out"), "wb"))
     dill.dump(chromatin_opening_error_rate, open(os.path.join(output_folder,"kpr_opening_error_rate.out"), "wb"))
+    dill.dump(chromatin_dfdc_S, open(os.path.join(output_folder,"kpr_dfdc_S.out"),"wb"))
+    dill.dump(chromatin_dfdC, open(os.path.join(output_folder,"kpr_dfdC.out"),"wb"))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

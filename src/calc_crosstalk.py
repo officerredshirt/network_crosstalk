@@ -58,6 +58,9 @@ def main(argv):
     # load crosstalk metric
     crosstalk_metric = manage_db.get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder)
 
+    if layer2_repressors:
+        gradients = manage_db.get_gradients_from_file(model_folder)
+
     if npatterns > len(target_patterns):
         npatterns = len(target_patterns)
     elif npatterns < 1:
@@ -105,8 +108,15 @@ def main(argv):
             #c_0[cur_input] = 10 
 
             #try:
-            optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
-                                       method = "L-BFGS-B", options = {"maxfun":1000000})
+            if layer2_repressors:
+                def f_and_df(c):
+                    return (crosstalk_objective_fn(c),1)
+
+                optres = optimize.minimize(f_and_df, c_0, jac=True, tol = eps, bounds = bnds,
+                                           method = "L-BFGS-B", options = {"maxfun":1000000})
+            else:
+                optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
+                                           method = "L-BFGS-B", options = {"maxfun":1000000})
 
             if (not target_independent_of_clusters) and (not layer2_repressors):
                 optres.x = concatenate((optres.x[0:N_PF_to_use],zeros(N_PF - N_PF_to_use),
