@@ -33,8 +33,8 @@ def get_varname_to_value_dict(df):
         labels_per_key = [f"{varname_dict[x[0]]} = {int(x[1])}" for x in key_val_pairs]
         varname_to_value = varname_to_value | dict(zip(key_val_pairs,labels_per_key))
 
-    boolean_vars = {("minimize_noncognate_binding",0):"optimize expression levels",
-                    ("minimize_noncognate_binding",1):"optimize binding profiles",
+    boolean_vars = {("minimize_noncognate_binding",0):"optimize expression",
+                    ("minimize_noncognate_binding",1):"optimize binding",
                     ("tf_first_layer",0):"chromatin",
                     ("tf_first_layer",1):"free DNA",
                     "tf_first_layer":"TF first layer",
@@ -589,7 +589,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
                             mastercolor=[1,1,1],sizenorm_lims=[],size_lims=[500,2000],
                             ylabel=[],fontsize=24,draw_lines=False,markeralpha=0.6,
                             suppress_leg=False,linewidth=2,normalize=False,
-                            transform_columns=static_columns,
+                            transform_columns=static_columns,legloc="lower left",
                             logfit=False,**kwargs):
     gb = df.groupby(cols[0:2],group_keys=True)
 
@@ -667,7 +667,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         handles += [mpl.lines.Line2D([0],[0],color=get_color_from_label(x,mastercolor),lw=linewidth)
                     for x in colorlabs]
 
-        ax.legend(handles,markerlabs + colorlabs,loc="upper right",frameon=False,
+        ax.legend(handles,markerlabs + colorlabs,loc=legloc,frameon=False,
                   markerscale=3.5,handlelength=1)
 
     if not ax:
@@ -847,7 +847,7 @@ def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],yla
         multiplier += 1
 
     ax.set_ylabel(ylabel,wrap=True,fontsize=fontsize)
-    plt.setp(ax.get_yticklabels()[1::2],visible=False)
+    #plt.setp(ax.get_yticklabels()[1::2],visible=False)
 
     try:
         ix = axticklabs[0].index("=")
@@ -1023,7 +1023,7 @@ def regulator_concentration_groupby(df,cols,title="",filename="",varnames_dict=[
 
     gb.apply(plot_one)
 
-    ax.set_xlabel("global expression error")
+    ax.set_xlabel("GEE")
     ax.set_ylabel("total regulator concentration")
     #lg = ax.legend(loc="lower right")
     lg = ax.legend(loc="upper right")
@@ -1039,58 +1039,78 @@ def regulator_concentration_groupby(df,cols,title="",filename="",varnames_dict=[
 
 
 def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],
-                                   fontsize=24,mastercolor=[1,1,1],**kwargs):
+                                   fontsize=24,colorbar_leg=True,mastercolor=[1,1,1],**kwargs):
     gb = df.groupby(cols,group_keys=True)
+    varname_to_color_dict = get_varname_to_color_dict()
 
     if not ax:
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
 
-    ncol1 = len(set(df[cols[0]]))
-    cur_color_list = np.linspace(0.2,1,ncol1).reshape(ncol1,1) * np.multiply(mastercolor,np.ones((1,3)))
-    colordict = {}
-    for ii, lab in enumerate(gb.groups.keys()):
-        colordict[lab] = cur_color_list[ii]
+    max_col1 = max(set(df[cols[1]]))
+    min_col1 = min(set(df[cols[1]]))
+    #ncol1 = len(set(df[cols[1]]))
+    #if ncol1 > 1:
+        #cur_color_list = np.linspace(0.2,1,ncol1).reshape(ncol1,1) * np.multiply(mastercolor,np.ones((1,3)))
+    #else:
+        #cur_color_list = [mastercolor]
+    #for ii, lab in enumerate(gb.groups.keys()):
+        #colordict[lab] = mastercolor#cur_color_list[ii]
 
     def scatter_one(gr):
+        cur_gr0_lab = get_label([cols[0]],to_tuple(gr.name[0]),varnames_dict)
+        if cur_gr0_lab in varname_to_color_dict.keys():
+            mastercolor = varname_to_color_dict[cur_gr0_lab]
+        else:
+            mastercolor = [1,1,1]
+        if max_col1 > min_col1:
+            curcolor = np.multiply((0.2 + 0.8*(gr.name[1]-min_col1)/(max_col1-min_col1)),mastercolor)
+        else:
+            curcolor = mastercolor
+
         target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
         cur_on_ix = target_pattern_vals > 0
         cur_total_error_frac = gr["output_error"].to_list()
         cur_total_error_frac = np.array([x[:,2] for x in cur_total_error_frac]).flatten()
-        cur_total_error_frac = manage_db.logical_ix(cur_total_error_frac,cur_on_ix)
+        #cur_total_error_frac = manage_db.logical_ix(cur_total_error_frac,cur_on_ix)
 
-        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
+        #labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
         bins = np.linspace(0,1,100)
-        ax.ecdf(cur_total_error_frac,label=labtext,color=colordict[gr.name],linewidth=5)
-        #ax.hist(cur_total_error_frac,bins=bins,alpha=0.5,label=labtext,color=colordict[gr.name])
-        #ax.plot(target_pattern_vals,cur_total_error_frac,'o',ms=5,alpha=0.2,label=labtext,
-                #color=colordict[gr.name])
-        #target_pattern_vals_on = manage_db.logical_ix(target_pattern_vals,target_pattern_vals > 0)
-        #ax.set_xlim(np.min(target_pattern_vals_on),np.max(target_pattern_vals_on))
+        #ax.ecdf(cur_total_error_frac,label=labtext,color=colordict[gr.name],linewidth=5)
+        ax.plot(target_pattern_vals,cur_total_error_frac,'o',ms=5,alpha=0.2,label=cur_gr0_lab,#labtext,
+                color=curcolor)#color=colordict[gr.name[1]])
+        target_pattern_vals_on = manage_db.logical_ix(target_pattern_vals,target_pattern_vals > 0)
+        ax.set_xlim(np.min(target_pattern_vals_on),np.max(target_pattern_vals_on))
 
     gb.apply(scatter_one)
 
-    #ax.set_xlabel("target expression level")
-    #ax.set_ylabel("total nontarget contribution")
-    ax.set_xlabel("total nontarget contribution")
-    ax.set_xlim(0,1)
-    #ax.set_ylim(0,1)
+    ax.set_xlabel("target expression level")
+    ax.set_ylabel("total nontarget contribution")
+    #ax.set_xlabel("total nontarget contribution")
+    #ax.set_xlim(0,1)
+    ax.set_box_aspect(1)
+    ax.set_ylim(0,1)
     ax.set_xticks([0,0.5,1])
     ax.set_yticks([0.5,1])
     ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
 
-    cur_cmap = mpl.colors.ListedColormap(cur_color_list)
-    cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cur_cmap),ax=ax,location='top')
-    cb.ax.get_xaxis().set_ticks([])
-    for j, lab in enumerate(gb.groups.keys()):
-        cur_label = f"{lab:.0f}"
-        cb.ax.text((2*j+1)/10.0,0.45,cur_label,ha='center',va='center',color='white',fontweight='bold')
-    cb.ax.get_xaxis().labelpad = 15
-    try:
-        cb.ax.set_xlabel(varnames_dict[cols[0]],fontsize=fontsize)
-    except Exception as e:
-        print(e)
-        pass
+    if colorbar_leg:
+        cur_cmap = mpl.colors.ListedColormap(cur_color_list)
+        cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cur_cmap),ax=ax,location='top')
+        cb.ax.get_xaxis().set_ticks([])
+        for j, lab in enumerate(gb.groups.keys()):
+            cur_label = f"{lab:.0f}"
+            cb.ax.text((2*j+1)/10.0,0.45,cur_label,ha='center',va='center',color='white',fontweight='bold')
+        cb.ax.get_xaxis().labelpad = 15
+        try:
+            cb.ax.set_xlabel(varnames_dict[cols[0]],fontsize=fontsize)
+        except Exception as e:
+            print(e)
+            pass
+    else:
+        lg = ax.legend(loc="upper right",markerscale=2)
+        for lgh in lg.get_lines():
+            lgh.set_alpha(1)
 
     if not title == "":
         ax.set_title(title,wrap=True,x=0.95,y=0.9,fontweight="bold",ha="right",fontsize=fontsize)
@@ -1151,7 +1171,8 @@ def scatter_expression_factor_groupby(df,cols,title="",filename="",varnames_dict
 
 
 def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
-                                      fontsize=24,colorbar_leg=True,gray_first_level=False,**kwargs):
+                                      fontsize=24,colorbar_leg=True,gray_first_level=False,
+                                      suppress_leg=False,**kwargs):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -1160,7 +1181,7 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
     ncol1 = len(set(df[cols[0]]))
     cur_color_list = np.linspace(0.2,1,ncol1).reshape(ncol1,1) * np.multiply(mastercolor,np.ones((1,3)))
     if gray_first_level:
-        cur_color_list[0,:] = 0.8*np.array([1,1,1])
+        cur_color_list[0,:] = 0.6*np.array([1,1,1])
     colordict = {}
     for ii, lab in enumerate(gb.groups.keys()):
         colordict[lab] = cur_color_list[ii]
@@ -1188,7 +1209,7 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
     ax.set_box_aspect(1)
 
     cur_cmap = mpl.colors.ListedColormap(cur_color_list)
-    if colorbar_leg:
+    if (not suppress_leg) and colorbar_leg:
         cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cur_cmap),ax=ax,location='top')
         cb.ax.get_xaxis().set_ticks([])
     for j, lab in enumerate(gb.groups.keys()):
@@ -1203,10 +1224,10 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
         print(e)
         pass
 
-    if not colorbar_leg:
+    if (not suppress_leg) and (not colorbar_leg):
         #lg = ax.legend(loc="upper center",markerscale=5,frameon=False,
                        #bbox_to_anchor=(0.5,1.17))
-        lg = ax.legend(loc="lower right",markerscale=5)
+        lg = ax.legend(loc="lower right",markerscale=5,fontsize=round(LEG_FONT_RATIO*fontsize))
         for lgh in lg.get_lines():
             lgh.set_alpha(1)
             lgh.set_marker('.')
@@ -1254,11 +1275,11 @@ def scatter_repressor_activator(df,cols,title="",filename="",ax=(),fontsize=24,v
 
     ax.set_xlim([0,1])
     ax.set_xlabel("target expression level",fontsize=fontsize)
-    ax.set_ylabel("target regulator concentration",fontsize=fontsize)
+    ax.set_ylabel("[TF]",fontsize=fontsize)
     ax.set_xticks([0,0.5,1])
-    ax.set_box_aspect(1)
+    #ax.set_box_aspect(1)
 
-    lg = ax.legend(loc="upper left",markerscale=5)
+    lg = ax.legend(loc="upper left",markerscale=5,fontsize=round(LEG_FONT_RATIO*fontsize))
     ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
 
     if not title == "":
