@@ -10,10 +10,10 @@ import pandas
 
 def main(argv):
     parser = argparse.ArgumentParser(
-            prog = "combine_df_to_csv",
+            prog = "combine_df_to_pq",
             description = "",
             epilog = "")
-    parser.add_argument("-o","--outfile",required=False,default="../combined_res.hdf")
+    parser.add_argument("-o","--outfile",required=False,default="../combined_res.pq")
     parser.add_argument("databases",nargs='*')
 
     args = parser.parse_args()
@@ -35,7 +35,7 @@ def main(argv):
         db_filenames.append(database)
 
     if os.path.exists(COMBINED_RESULTS):
-        df = pandas.read_hdf(COMBINED_RESULTS,key="df")
+        df = pandas.read_parquet(COMBINED_RESULTS)
         df = plot_db.combine_databases(db_filenames,df=df)
     else:
         df = plot_db.combine_databases(db_filenames)
@@ -48,7 +48,7 @@ def main(argv):
     df = plot_db.calc_modulating_concentrations(df)
 
     print("Saving...")
-    df.to_hdf(COMBINED_RESULTS,key="df",mode="w",complevel=9)
+    df.to_parquet(COMBINED_RESULTS)
     print(df)
 
 

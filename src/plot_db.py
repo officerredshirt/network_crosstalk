@@ -94,6 +94,14 @@ def convert_to_dataframe(db_filename):
     df["modulating_concentrations"] = df["modulating_concentrations"].astype(object)
     df["error_metric_post_modulation"] = np.nan
     df["error_metric_post_modulation"] = df["error_metric_post_modulation"].astype(object)
+    df["output_error"] = df.parallel_apply(lambda x: x["output_error"].tolist(),axis=1)
+
+    def sparsify(row,name):
+        return row[name].nonzero()
+    sparse_columns = ["T","R","G"]
+    for name in sparse_columns:
+        df[name] = df.parallel_apply(lambda x: sparsify(x,name),axis=1)
+
     if "ratio_KNS_KS" not in df.columns:
         df["ratio_KNS_KS"] = df["K_NS"]/df["K_S"]
     return df
@@ -108,6 +116,7 @@ def combine_databases(db_filenames,df=[]):
         elif any([db_filename in x for x in df["filename"]]):
             print(f"{db_filename} already in dataframe--skipping...")
         else:
+            print(f"Adding {db_filename} to dataframe...")
             new_df = convert_to_dataframe(db_filename)
             if not set(["ignore_off_during_optimization","target_independent_of_clusters"]).issubset(new_df.columns):
                 new_df["ignore_off_during_optimization"] = int(0)
@@ -586,7 +595,7 @@ def static_columns(vals,cols):
     return vals
 
 def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
-                            mastercolor=[1,1,1],sizenorm_lims=[],size_lims=[500,2000],
+                            mastercolor=[1,1,1],sizenorm_lims=[],size_lims=[100,500],
                             ylabel=[],fontsize=24,draw_lines=False,markeralpha=0.6,
                             suppress_leg=False,linewidth=2,normalize=False,
                             transform_columns=static_columns,legloc="lower left",
@@ -604,7 +613,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         sys.exit()
 
     #color_multiplier = np.linspace(1,0.2,ncol1)
-    marker_dict = {0:"o",1:"X"}
+    marker_dict = {0:"o",1:"P"}
     def scatter_one(gr,sizenorm_lims):
         try:
             gr["temp_barchart_fn"] = f(gr)
@@ -656,7 +665,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
     ax.set_xlabel(varnames_dict[cols[3]],fontsize=fontsize)
     ax.set_xscale("log")
     ax.set_ylabel(ylabel,fontsize=fontsize)
-    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
+    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize),which="both")
 
     if not suppress_leg:
         f = lambda m,c: plt.plot([],[],marker=m,color=c,ls="none")[0]
@@ -1084,11 +1093,11 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[]
 
     gb.apply(scatter_one)
 
-    ax.set_xlabel("target expression level")
-    ax.set_ylabel("total nontarget contribution")
+    ax.set_xlabel("target expression")
+    ax.set_ylabel("nontarget\ncontribution")
     #ax.set_xlabel("total nontarget contribution")
     #ax.set_xlim(0,1)
-    ax.set_box_aspect(1)
+    #ax.set_box_aspect(1)
     ax.set_ylim(0,1)
     ax.set_xticks([0,0.5,1])
     ax.set_yticks([0.5,1])
@@ -1171,7 +1180,7 @@ def scatter_expression_factor_groupby(df,cols,title="",filename="",varnames_dict
 
 
 def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
-                                      fontsize=24,colorbar_leg=True,gray_first_level=False,
+                                      fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
                                       suppress_leg=False,**kwargs):
     gb = df.groupby(cols,group_keys=True)
 
@@ -1193,15 +1202,19 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
         ax.plot([0,1],[0,1],color="gray",linewidth=1)
         labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
-        ax.plot(target_pattern_vals,actual_expression,'o',ms=5,alpha=0.2,label=labtext,
+        if not len(markerdict.keys()) == 0:
+            cur_marker = markerdict[gr.name]
+        else:
+            cur_marker = 'o'
+        ax.plot(target_pattern_vals,actual_expression,cur_marker,ms=5,alpha=0.2,label=labtext,
                 color=colordict[gr.name])
         ax.plot(0,np.mean(manage_db.logical_ix(actual_expression,target_pattern_vals == 0)),
                    color=colordict[gr.name],marker='X',markersize=20,clip_on=False,zorder=10)
 
     gb.apply(scatter_one)
 
-    ax.set_xlabel("target expression level",fontsize=fontsize)
-    ax.set_ylabel("actual expression level",fontsize=fontsize)
+    ax.set_xlabel("target expression",fontsize=fontsize)
+    ax.set_ylabel("actual expression",fontsize=fontsize)
     ax.set_xlim(0,1)
     ax.set_ylim(0,1)
     ax.set_xticks([0,0.5,1])
@@ -1469,7 +1482,7 @@ def calc_modulating_concentrations(df):
 
     print("Calculating modulating concentrations...")
     def calc_one_row(row):
-        if not row["layer2_repressors"]:
+        if (not row["layer2_repressors"]) and (row["N_CLUSTERS"] == 8):
             if np.isnan(row["modulating_concentrations"]).any():
                 db_folder = os.path.dirname(row.filename)
                 print(".",end="",flush=True)

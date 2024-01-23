@@ -9,15 +9,16 @@ import numpy as np
 import warnings
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
-from matplotlib.ticker import FormatStrFormatter
+import matplotlib.image as mpimg
+from matplotlib import ticker
 from matplotlib.lines import Line2D
 
 HIGHLY_EXPRESSING_THRESHOLD = 0.8
 RATIO_FOR_SINGLE_EXAMPLES = 1000
 GEN_FIGURE_2 = False
-GEN_FIGURE_3 = True
+GEN_FIGURE_3 = False
 GEN_FIGURE_4 = False
-GEN_FIGURE_5 = False
+GEN_FIGURE_5 = True
 GEN_SUPPLEMENTAL = False
 
 pandas.options.mode.chained_assignment = None
@@ -38,7 +39,14 @@ def main(argv):
     resfile = args.resfile
 
     if os.path.exists(resfile):
-        df = pandas.read_hdf(resfile,"df")
+        extension = os.path.splitext(resfile)[1]
+        if extension == ".hdf":
+            df = pandas.read_hdf(resfile,"df")
+        elif extension == ".pq":
+            df = pandas.read_parquet(resfile)
+        else:
+            print(f"unsupported file extension {extension}")
+            sys.exit()
     else:
         print(f"error: {resfile} does not exist")
         sys.exit()
@@ -189,7 +197,7 @@ def main(argv):
                                  legloc="upper left",#subtitles=[""],
                                  fontsize=fntsz,ylabel="GEE",
                                  varnames_dict=varnames_dict)
-        axd["G"].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        axd["G"].yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
         axd["G"].text(0.3,0.56,f"intrinsic\nspecificity\n= {RATIO_FOR_SINGLE_EXAMPLES}",
                       transform=axd["G"].transAxes,va="center",ha="center")
 
@@ -221,19 +229,35 @@ def main(argv):
         plt.savefig("../plots/fig/fig2.png")
         plt.close()
     
+
     # ----- FIGURE 3 ----- #
     if GEN_FIGURE_3:
-        fig = plt.figure(figsize=(20,24),layout="tight")
+        fig = plt.figure(figsize=(22,16),layout="tight")
 
-        outer = gs.GridSpec(2,1,height_ratios=[1,1])
-        inner0 = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = outer[0],width_ratios=[1.7,1],wspace=0.15)
-        scatter_actual = gs.GridSpecFromSubplotSpec(3,1,subplot_spec = inner0[1],hspace=0.05,
-                                                    height_ratios=[0.4,1,1])
+        #outer = gs.GridSpec(2,1,height_ratios=[0.5,1])
+        #littler_plots = gs.GridSpecFromSubplotSpec(1,2,width_ratios=[1.2,1],subplot_spec=outer[0])
+        #schematic = gs.GridSpecFromSubplotSpec(1,1,height_ratios=[1],subplot_spec=littler_plots[0])
+        #scatter_actual = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = littler_plots[1],hspace=0.05)
+        #boxy_plots = gs.GridSpecFromSubplotSpec(1,2,subplot_spec=outer[1])
 
-        axd = {"A":plt.subplot(inner0[0]),
-               "B":plt.subplot(scatter_actual[1]),
-               "C":plt.subplot(scatter_actual[2]),
-               "D":plt.subplot(outer[1])}
+        outer = gs.GridSpec(2,1,height_ratios=[0.7,1])
+        littler_plots = gs.GridSpecFromSubplotSpec(1,2,width_ratios=[1,1],subplot_spec=outer[0],
+                                                   wspace=0.3)
+        schematic = gs.GridSpecFromSubplotSpec(1,1,height_ratios=[1],subplot_spec=littler_plots[0])
+        boxy_plots = gs.GridSpecFromSubplotSpec(1,2,subplot_spec=outer[1],width_ratios=[1,1],
+                                                wspace=0.22)
+        boxy_left = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=boxy_plots[0],height_ratios=[3,1])
+        scatter_actual = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = boxy_left[0],hspace=0.05)
+
+        axd = {"A":plt.subplot(littler_plots[1]),
+               "B":plt.subplot(scatter_actual[0]),
+               "C":plt.subplot(scatter_actual[1]),
+               "D":plt.subplot(boxy_plots[1]),
+               "E":plt.subplot(schematic[0])}
+
+        nontarget_contribution_schematic = mpimg.imread("../plots/fig/nontarget_contribution_schematic2.png")
+        axd["E"].imshow(nontarget_contribution_schematic)
+        axd["E"].axis("off")
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                                         (df_normal["M_GENE"] == m_gene) &
@@ -244,42 +268,31 @@ def main(argv):
                                  ["minimize_noncognate_binding"],
                                  ax=[axd["B"],axd["C"]],fontsize=fntsz,
                                  subtitles=["",""],suppress_leg=True,
+                                 markerdict={0:"o",1:"P"},
                                  colorbar_leg=False,gray_first_level=True,
                                  varnames_dict=varnames_dict)
         box1 = axd["B"].get_position()
         box2 = axd["C"].get_position()
-        #axd["C"].text(1.1,1.2,f"intrinsic specificity = {RATIO_FOR_SINGLE_EXAMPLES}",fontsize=fntsz,
-                      #ha="center",va="center")
-        axd["B"].set_xlabel("")
-        axd["B"].set_ylabel("")
-        plt.setp(axd["B"].get_xticklabels(),visible=False)
-        axd["C"].yaxis.set_label_coords(-0.2,1.02)
+        axd["B"].xaxis.set_label_coords(1.1,-0.15)
+        axd["C"].set_ylabel("")
+        axd["C"].set_xlabel("")
+        axd["B"].set_xticks([0,1])
+        axd["B"].set_yticks([0,1])
+        axd["C"].set_xticks([0,1])
+        axd["C"].set_yticks([0,1])
+        plt.setp(axd["C"].get_yticklabels(),visible=False)
 
         color_dict = plot_db.get_varname_to_color_dict()
-        legend_elements = [Line2D([0],[0],marker='o',color='w',
-                                  markerfacecolor=color_dict["chromatin"],markersize=12,
+        legend_elements = [Line2D([0],[0],marker='P',color='w',
+                                  markerfacecolor=color_dict["chromatin"],markersize=20,
                                   label="optimize binding (chromatin)"),
-                           Line2D([0],[0],marker='o',color='w',
-                                  markerfacecolor=color_dict["free DNA"],markersize=12,
+                           Line2D([0],[0],marker='P',color='w',
+                                  markerfacecolor=color_dict["free DNA"],markersize=20,
                                   label="optimize binding (free DNA)"),
                            Line2D([0],[0],marker='o',color='w',
-                                  markerfacecolor=[0.6,0.6,0.6],markersize=12,
+                                  markerfacecolor=[0.6,0.6,0.6],markersize=20,
                                   label="optimize expression")]
-        customleg = axd["B"].legend(handles=legend_elements,bbox_to_anchor=(0.5,1.4),loc="center")
-
-        #plot_db.subplots_groupby(df_normal.loc[(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-        #                                (df_normal["M_GENE"] == m_gene)],
-        #                         "M_GENE",
-        #                         [],[],
-        #                         plot_db.symbolscatter_groupby,
-        #                         ["ratio_KNS_KS","tf_first_layer","minimize_noncognate_binding"],
-        #                         plot_db.rms_patterning_error,
-        #                         subtitles=[""],
-        #                         ax=[axd["E"]],fontsize=fntsz,take_ratio=True,
-        #                         ylabel="fold-reduction in error",
-        #                         legloc="upper left",
-        #                         varnames_dict=varnames_dict)
-        #axd["E"].set_yscale("log")
+        customleg = axd["B"].legend(handles=legend_elements,bbox_to_anchor=(1.07,-0.65),loc="center")
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
                                         (df_normal["M_GENE"] == m_gene) &
@@ -293,6 +306,8 @@ def main(argv):
                                  ax=[axd["A"]],fontsize=fntsz,
                                  colorbar_leg=False,
                                  varnames_dict=varnames_dict)
+        #axd["A"].plot(0.5,0.2,'X',color='k')
+        #axd["A"].plot(0.5,0.14,'X',color='k')
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                                                (df_normal["M_GENE"] == m_gene)],
@@ -310,11 +325,12 @@ def main(argv):
         axd["D"].set_xticks(xticks)
         axd["D"].plot([1e2,1e4],[0.018,0.018],"gray",linewidth=2,linestyle="dashed")
         axd["D"].set_xlim(xticks[0],xticks[-1])
+        #axd["D"].set_box_aspect(1)
 
-        #plt.gcf().text(0.01,0.96,"A",fontsize=fntsz,fontweight="bold")
-        #plt.gcf().text(0.01,0.62,"B",fontsize=fntsz,fontweight="bold")
-        #plt.gcf().text(0.66,0.625,"C",fontsize=fntsz,fontweight="bold")
-        #plt.gcf().text(0.01,0.275,"D",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.01,0.94,"A",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.005,0.534,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.50,0.94,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.485,0.529,"D",fontsize=fntsz,fontweight="bold")
 
         plt.savefig("../plots/fig/fig3.png")
         plt.close()
@@ -324,22 +340,6 @@ def main(argv):
     if GEN_FIGURE_4:
         fig = plt.figure(figsize=(30,20),layout="tight")
 
-    #    outer = gs.GridSpec(1,2,width_ratios=[2.2,1])
-    #    inner0 = gs.GridSpecFromSubplotSpec(3,1,subplot_spec = outer[0],hspace=0.05,
-    #                                        height_ratios=[1,0.2,1])
-    #    scattertarget = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = inner0[0],wspace=0.05)
-    #    scatterreg = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = inner0[1],wspace=0.05)
-    #    scatterbigdyn = gs.GridSpecFromSubplotSpec(1,2,subplot_spec = inner0[2],wspace=0.05)
-    #    inner1 = gs.GridSpecFromSubplotSpec(3,1,subplot_spec = outer[1])
-    #    axd = {"A":plt.subplot(scattertarget[0]),
-    #           "B":plt.subplot(scattertarget[1]),
-    #           "C":plt.subplot(inner1[0]),
-    #           "D":plt.subplot(scatterreg[0]),
-    #           "E":plt.subplot(scatterreg[1]),
-    #           "F":plt.subplot(inner1[1]),
-    #           "G":plt.subplot(scatterbigdyn[0]),
-    #           "H":plt.subplot(scatterbigdyn[1]),
-    #           "I":plt.subplot(inner1[2])}
         outer = gs.GridSpec(1,2,width_ratios=[1.1,1])
         normal = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=outer[0],height_ratios=[1.5,1])
         normal_scatter = gs.GridSpecFromSubplotSpec(2,2,subplot_spec=normal[0],height_ratios=[2.5,1],
@@ -358,16 +358,6 @@ def main(argv):
                "G":plt.subplot(extended_scatter[0]),
                "H":plt.subplot(extended_scatter[1]),
                "I":plt.subplot(extended[1])}
-
-        """
-        for ii in list([200,500,1000,2000,5000]):
-            temp_test = df.loc[(df["layer2_repressors"] == 1) & \
-                    (df["MIN_EXPRESSION"] == 0.009) & \
-                    (df["ratio_KNS_KS"] == ii) & \
-                    (df["tf_first_layer"] == 1)]
-            print(f"{ii}: {len(temp_test['filename'])}")
-        sys.exit()
-        """
 
         plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
@@ -488,8 +478,6 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         axd["C"].set_ylim(0,0.06)
         axd["C"].set_yticks([0,0.03,0.06])
-        #axd["C"].text(0.3,0.56,f"intrinsic\nspecificity\n= {RATIO_FOR_SINGLE_EXAMPLES}",
-                      #transform=axd["C"].transAxes,va="center",ha="center")
 
         plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
@@ -552,19 +540,27 @@ def main(argv):
         plt.setp(axd["B"].get_xticklabels(),visible=False)
         plt.setp(axd["B"].get_yticklabels(),visible=False)
 
-        plt.gcf().text(0.012,0.950,"A",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.012,0.604,"B",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.012,0.384,"C",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.268,0.384,"D",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.520,0.942,"E",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.527,0.550,"F",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.012,0.950,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.012,0.604,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.012,0.384,"D",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.268,0.384,"E",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.520,0.942,"F",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.527,0.550,"G",fontsize=fntsz,fontweight="bold")
 
         plt.savefig("../plots/fig/fig4.png")
         plt.close()
 
 
+    """
     # ----- FIGURE 5 ----- #
     if GEN_FIGURE_5:
+        maxclust_to_check = [50,60,70,80,100]
+        ngenes = 1000
+        for ii in maxclust_to_check:
+            nentries = len(df_normal.loc[(df_normal['MAX_CLUSTERS_ACTIVE'] == ii)])
+            print(f"{ii}: {nentries}")
+        sys.exit()
+
         fig, ax = plt.subplots(2,3,figsize=(42,42),layout="tight")
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
@@ -589,6 +585,7 @@ def main(argv):
 
         collapse_exponent_free_DNA = 1.3
         collapse_exponent_chromatin = 2.5
+
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
                                                (df_normal["minimize_noncognate_binding"] == 0) &
                                                (df_normal["tf_first_layer"] == 1)],
@@ -615,17 +612,16 @@ def main(argv):
                                  ylabel=f"RMSE / (fraction ON genes)^{collapse_exponent_chromatin}",
                                  varnames_dict=varnames_dict)
         ax[0][1].set_ylabel("RMSE / (fraction ON genes)^p")
-        """
+
         N = np.linspace(100,500,100)
         exponent = 1.4
         ax[0][1].plot(N,(0.035/np.power(100,exponent))*np.power(N,exponent),linewidth=5,color="k")
         exponent = 2.6
         ax[0][1].plot(N,(0.005/np.power(100,exponent))*np.power(N,exponent),linewidth=5,color="k")
-        """
         ax[0][1].set_yscale("log")
 
         def fraction_on(vals,cols):
-            vals[cols[2]] = 10*vals[cols[2]].div(vals[cols[3]])
+            vals[cols[3]] = 10*vals[cols[2]].div(vals[cols[3]])
             return vals
 
         def numonoff(vals,cols):
@@ -644,37 +640,103 @@ def main(argv):
                                  ax=[ax[0][2]],fontsize=fntsz,
                                  suppress_leg=True,draw_lines=False,
                                  transform_columns=numonoff,
-                                 ylabel="GEE",
+                                 ylabel="RMSE / (fraction ON genes)^p",
                                  varnames_dict=varnames_dict)
         ax[0][2].set_xscale("linear")
         ax[0][2].set_xlabel("number OFF genes")
 
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["tf_first_layer"] == 0) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_normal["M_GENE"] == m_gene)],
-                                 "M_GENE",
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+                                               (df_normal["minimize_noncognate_binding"] == 0) &
+                                               (df_normal["tf_first_layer"] == 1)],
+                                 ["ratio_KNS_KS"],
                                  [],[],
-                                 plot_db.symbolscatter_groupby,
-                                 ["ratio_KNS_KS","minimize_noncognate_binding"],
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 lambda x: plot_db.curve_collapse(x,collapse_exponent_chromatin/2),#collapse_exponent_free_DNA),
+                                 ax=[ax[0][2]],fontsize=fntsz,
+                                 suppress_leg=True,draw_lines=False,
+                                 transform_columns=numonoff,
+                                 ylabel="RMSE / (fraction ON genes)^p",
+                                 varnames_dict=varnames_dict)
+        ax[0][2].set_xscale("linear")
+        ax[0][2].set_xlabel("number OFF genes")
+    """
+
+    # ----- FIGURE 5 ----- #
+    if GEN_FIGURE_5:
+        #fig, ax = plt.subplots(2,3,figsize=(42,42),layout="tight")
+        fig = plt.figure(figsize=(20,10),layout="tight")
+
+        outer = gs.GridSpec(1,2)
+
+        axd = {"A":plt.subplot(outer[0]),
+               "B":plt.subplot(outer[1])}
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+                                               (df_normal["minimize_noncognate_binding"] == 0) &
+                                               (df_normal["MAX_CLUSTERS_ACTIVE"] <= 10)],
+                                 ["ratio_KNS_KS"],
+                                 [],[],
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
                                  plot_db.rms_patterning_error,
-                                 ax=[ax[1][0]],suppress_leg=False,
-                                 subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
+                                 ax=[axd["A"]],fontsize=fntsz,
+                                 subtitles=[""],
+                                 suppress_leg=True,draw_lines=True,
+                                 ylabel="GEE",
                                  varnames_dict=varnames_dict)
-        ax[1][0].set_ylabel("patterning error")
+        axd["A"].set_xticks([100,150,250,500])
+        axd["A"].xaxis.set_major_formatter(ticker.ScalarFormatter())
+        axd["A"].xaxis.set_minor_formatter(ticker.NullFormatter())
+        axd["A"].set_yticks([0,0.02,0.04])
 
+        def numon(vals,cols):
+            N_ON = 10*vals[cols[2]]
+            M = vals[cols[3]]
+            vals[cols[3]] = N_ON # x-axis
+            vals[cols[2]] = N_ON.div(M) # marker sizing
+            return vals
 
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["tf_first_layer"] == 0) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_normal["M_GENE"] == m_gene)],
-                                 "M_GENE",
+        def hundred_percent_on(df):
+            d = plot_db.rms_patterning_error(df)
+            fraction_on = df["MAX_CLUSTERS_ACTIVE"].div(df["N_CLUSTERS"],axis=0)
+            d.loc[fraction_on < 1] = None
+            return d
+
+        def rel_to_hundred_percent_on(df,refs):
+            d = plot_db.rms_patterning_error(df)
+            return d.div(df["M_GENE"].map(refs))
+
+        def get_refs(df):
+            fraction_on = df["MAX_CLUSTERS_ACTIVE"].div(df["N_CLUSTERS"],axis=0)
+            new_df = df.loc[fraction_on == 1]
+            gb = new_df.groupby("M_GENE",group_keys=True)
+            gbn = gb.apply(plot_db.rms_patterning_error)
+            gbn = gbn.groupby("M_GENE",group_keys=True)
+            return gbn.mean().to_dict()
+
+        dfoi = df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+                             (df_normal["minimize_noncognate_binding"] == 0)]
+        #refs = get_refs(dfoi)
+        
+        plot_db.subplots_groupby(dfoi,
+                                 ["ratio_KNS_KS"],
                                  [],[],
-                                 plot_db.symbolscatter_groupby,
-                                 ["ratio_KNS_KS","minimize_noncognate_binding"],
-                                 lambda x: np.log(plot_db.rms_patterning_error(x)),
-                                 ax=[ax[1][1]],suppress_leg=False,
-                                 subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 plot_db.rms_patterning_error,#lambda x: rel_to_hundred_percent_on(x,refs),
+                                 ax=[axd["B"]],fontsize=fntsz,
+                                 suppress_leg=True,draw_lines=False,
+                                 subtitles=[""],
+                                 transform_columns=numon,
+                                 ylabel="GEE",# / max RMSE for M genes",
                                  varnames_dict=varnames_dict)
-        ax[1][1].set_ylabel("patterning error")
+        axd["B"].set_xscale("log")
+        axd["B"].set_yscale("log")
+        axd["B"].set_xlabel("number of ON genes")
+
+        plt.gcf().text(0.012,0.920,"A",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.512,0.920,"B",fontsize=fntsz,fontweight="bold")
 
         plt.savefig("../plots/fig/fig5.png")
         plt.close()
@@ -691,7 +753,6 @@ def main(argv):
                                      ["ratio_KNS_KS"],
                                      ax=[axd["F"],axd["G"]],fontsize=fntsz,
                                      varnames_dict=varnames_dict)
-            # TODO: colorscatter for dynamic range?
 
 if __name__ == "__main__":
     main(sys.argv[1:])
