@@ -18,8 +18,9 @@ RATIO_FOR_SINGLE_EXAMPLES = 1000
 GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
 GEN_FIGURE_4 = False
-GEN_FIGURE_5 = True
+GEN_FIGURE_5 = False
 GEN_SUPPLEMENTAL = False
+GEN_TEST = True
 
 pandas.options.mode.chained_assignment = None
 
@@ -63,7 +64,7 @@ def main(argv):
     m_gene = 250
 
     df["N_PF"] = df["N_PF"].astype(pandas.Int64Dtype())
-    df["N_TF"] = df["N_PF"].astype(pandas.Int64Dtype())
+    df["N_TF"] = df["N_TF"].astype(pandas.Int64Dtype())
     df = df.loc[(df["layer1_static"] == False) & (df["ratio_KNS_KS"] > 100) &
                (df["MIN_EXPRESSION"] < 0.3)]
     
@@ -685,7 +686,9 @@ def main(argv):
                                  suppress_leg=True,draw_lines=True,
                                  ylabel="GEE",
                                  varnames_dict=varnames_dict)
-        axd["A"].set_xticks([100,150,250,500])
+        #axd["A"].set_yscale("log")
+        #axd["A"].yaxis.set_minor_formatter(ticker.NullFormatter())
+        axd["A"].set_xticks([100,150,250,500,1000])
         axd["A"].xaxis.set_major_formatter(ticker.ScalarFormatter())
         axd["A"].xaxis.set_minor_formatter(ticker.NullFormatter())
         axd["A"].set_yticks([0,0.02,0.04])
@@ -743,16 +746,63 @@ def main(argv):
 
 
 
-        if GEN_SUPPLEMENTAL:
-            plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 1) &
-                                            (df_normal["M_GENE"] == m_gene) &
-                                            (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
-                                     ["tf_first_layer"],
-                                     [],[],
-                                     plot_db.scatter_error_fraction_groupby,
-                                     ["ratio_KNS_KS"],
-                                     ax=[axd["F"],axd["G"]],fontsize=fntsz,
-                                     varnames_dict=varnames_dict)
+    if GEN_SUPPLEMENTAL:
+        #plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 1) &
+                                        #(df_normal["M_GENE"] == m_gene) &
+                                        #(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
+                                 #["tf_first_layer"],
+                                 #[],[],
+                                 #plot_db.scatter_error_fraction_groupby,
+                                 #["ratio_KNS_KS"],
+                                 #ax=[axd["F"],axd["G"]],fontsize=fntsz,
+                                 #varnames_dict=varnames_dict)
+
+        fig, ax = plt.subplots(4,4,figsize=(60,60),layout="tight")
+
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
+                                               (df_normal["ratio_KNS_KS"] == 1000) &
+                                               (df_normal["MAX_CLUSTERS_ACTIVE"] <= 10) &
+                                               (df_normal["M_GENE"] <= 500)],
+                                 ["MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 [],[],
+                                 plot_db.scatter_target_expression_groupby,
+                                 ["tf_first_layer"],
+                                 fontsize=fntsz,ax=ax,
+                                 varnames_dict=varnames_dict)
+
+        plt.savefig("../plots/fig/supp.png")
+        plt.close()
+
+
+    if GEN_TEST:
+        fig, ax = plt.subplots(2,3,figsize=(40,20),layout="tight")
+
+        #plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
+                                               #(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                               #(df_normal["M_GENE"] == m_gene)],
+                                 #["ratio_KNS_KS"],
+                                 #[],[],
+                                 #plot_db.hist_fluctuations_groupby,
+                                 #["tf_first_layer"],
+                                 #fontsize=fntsz,ax=ax,
+                                 #varnames_dict=varnames_dict)
+
+        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df["minimize_noncognate_binding"] == 0) &
+                                        (df["target_independent_of_clusters"] == 0) &
+                                        (df["ignore_off_during_optimization"] == 0) &
+                                        (df["layer2_repressors"] == 1) &
+                                        (df["MIN_EXPRESSION"] > 0.01)],
+                                 ["ratio_KNS_KS"],
+                                 [],[],
+                                 plot_db.hist_fluctuations_groupby,
+                                 ["tf_first_layer"],
+                                 fontsize=fntsz,ax=ax,
+                                 varnames_dict=varnames_dict)
+
+        plt.savefig("../plots/fig/test2.png")
+        plt.close()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

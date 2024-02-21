@@ -230,6 +230,7 @@ def effective_dynamic_range_per_row(row):
         on_expression = np.array(manage_db.logical_ix(row["output_expression"],on_ix))
         return max(on_expression) - min(on_expression)
 
+
 def effective_dynamic_range(df):
     # TAKE 1: defined as max(ON expression) - min(ON expression)
     return df.parallel_apply(effective_dynamic_range_per_row,axis=1)
@@ -591,8 +592,10 @@ def get_color_from_label(label,mastercolor):
         color = mastercolor
     return color
 
+
 def static_columns(vals,cols):
     return vals
+
 
 def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],
                             mastercolor=[1,1,1],sizenorm_lims=[],size_lims=[100,500],
@@ -807,6 +810,7 @@ def rms_scatter_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylab
 
     #axticklabs = axticklabs[0:ncol0]
     #ax.set_xticks(labelloc + width*((ncol0-1)/2),axticklabs)
+
 
 def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",
                      legloc="upper right",axlabel=[],mastercolor=[],legncol=1,suppress_leg=False,
@@ -1179,6 +1183,38 @@ def scatter_expression_factor_groupby(df,cols,title="",filename="",varnames_dict
         plt.savefig(filename)
 
 
+def hist_fluctuations_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
+                                      fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
+                                      suppress_leg=False,**kwargs):
+    gb = df.groupby(cols,group_keys=True)
+    varname_to_color_dict = get_varname_to_color_dict()
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    def hist_one(gr):
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
+        cur_color = varname_to_color_dict[labtext]
+
+        fluctuation_patterning_errors = np.array(calc_rmse_with_fluctuations(gr,0.1,10).to_list()).flatten()
+        actual_patterning_error = np.array(rms_patterning_error(gr).to_list()).flatten()
+
+        nbins = 10
+        ax.hist(actual_patterning_error,nbins,color=0.5*cur_color,alpha=0.5,density=True)
+        ax.hist(fluctuation_patterning_errors,nbins,color=cur_color,alpha=0.5,density=True,label=labtext)
+
+    gb.apply(hist_one)
+
+    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
+    ax.set_ylim(0,500)
+    ax.legend()
+
+    if not title == "":
+        ax.set_title(title,wrap=True,x=0.05,y=0.9,fontweight='bold',ha="left",fontsize=fontsize)
+    if not filename == "":
+        plt.savefig(filename)
+
+
 def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
                                       fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
                                       suppress_leg=False,**kwargs):
@@ -1519,3 +1555,49 @@ def calc_modulating_concentrations(df):
         return row
 
     return df.parallel_apply(calc_one_row,axis=1)
+
+
+# Calculate RMSE when perturb multiplicatively from optimal concentration as
+# c' = c_opt(1+normal(0,sigma^2))
+def calc_rmse_with_fluctuations(df,sigma,nrep):
+    def calc_one_row(row):
+        print(".")
+        f = manage_db.get_crosstalk_metric_from_row(row)
+        rmse = np.empty((nrep,1))
+        for ii in range(nrep):
+            c_perturbed = np.multiply(row["optimized_input"], \
+                    1+np.random.normal(scale=sigma,size=row["optimized_input"].shape))
+            expression_perturbed = f([],c_perturbed[0:row["N_PF"]],c_perturbed[row["N_PF"]:],return_var="gene_exp")
+            d = expression_perturbed - row["target_pattern"]
+            d = d@d
+            rmse[ii] = np.sqrt(d/row["M_GENE"])
+        return rmse
+    return df.parallel_apply(calc_one_row,axis=1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

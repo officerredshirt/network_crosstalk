@@ -182,35 +182,6 @@ def get_formatted(db_filename,table,query=None):
     return formatted_res
 
 
-# idealized curve: given a concentration of noncogate factors,
-# what specific layer 2 concentration would give exactly the
-# target expression level? (ignoring layer 1 binding)
-def calc_optimal_cS_for_fixed_other_cNS(db_filename):
-    check_db_exists(db_filename)
-
-    # add column to database if doesn't exist
-    con = sqlite3.connect(db_filename)
-    cur = con.cursor()
-    if "layer2_cS_for_fixed_other_cNS" not in [x[1] for x in cur.execute("PRAGMA table_info(xtalk)")]:
-        cur.execute("ALTER TABLE xtalk ADD COLUMN layer2_cS_for_fixed_other_cNS")
-
-    res = get_formatted(db_filename,"xtalk")
-
-    def objective_fn(c_NS,c_S,target):
-        return tf_pr_bound(c_NS+c_S,c_S) - target
-
-    for ii, target in enumerate(res["target_pattern"]):
-        if res["layer2_cS_for_fixed_other_cNS"][ii] == None:
-            layer2_cS_given_noncog = np.zeros(len(res["target_pattern"][0]))
-            for ii_gene, target_level in enumerate(target):
-                cur_C_NS = np.sum(res["optimized_input"][ii]) - res["optimized_input"][ii][ii_gene]
-                layer2_cS_given_noncog[ii_gene] = scipy.optimize.fsolve(lambda x: objective_fn(cur_C_NS,x,target),res["optimized_input"][ii][ii_gene])
-        cur.execute(f"UPDATE xtalk SET layer2_cS_for_fixed_other_cNS = {layer2_cS_given_noncog.tobytes()} WHERE network_rowid = {res['network_rowid'][ii]}")
-
-    con.close()
-    #TODO: back up databases, test this function, add to compile_results, use in plotting
-
-
 def plot_xtalk_errors(db_folder,folder_out):
     plot_error_contributions(os.path.join(db_folder,"local_db.db"),folder_out)
     plot_error_fraction(db_folder,folder_out)
@@ -929,7 +900,22 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
 
 
 def get_crosstalk_metric_from_row(row):
-    return get_crosstalk_metric(row["R"],row["T"],row["G"],row["N_PF"],row["N_TF"], \
+    def desparsify(ix,dim):
+        A = np.zeros(dim)
+        A[ix] = 1
+        return A
+
+    R = np.array(row["R"])
+    T = np.array(row["T"])
+    G = np.array(row["G"])
+    if any(np.concatenate(R).ravel() > 1):
+        R = desparsify(tuple(R),(row["M_ENH"],row["N_PF"]))
+    if any(np.concatenate(T).ravel() > 1):
+        T = desparsify(tuple(T),(row["M_ENH"],row["N_TF"]))
+    if any(np.concatenate(G).ravel() > 1):
+        G = desparsify(tuple(G),(row["M_ENH"],row["M_GENE"]))
+
+    return get_crosstalk_metric(R,T,G,row["N_PF"],row["N_TF"], \
             row["crosslayer_crosstalk"],row["tf_first_layer"],row["minimize_noncognate_binding"], \
             row["layer2_repressors"],os.path.dirname(row["filename"]))
 
