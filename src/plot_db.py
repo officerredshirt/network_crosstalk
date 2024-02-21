@@ -897,6 +897,80 @@ def rms_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],yla
         plt.savefig(filename)
 
 
+def fluctuation_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],ylabel="mean",
+                     legloc="upper right",axlabel=[],mastercolor=[],legncol=1,suppress_leg=False,
+                     bbox_to_anchor=None,fontsize=24,**kwargs):
+    def mean_per_row(row,name):
+        return np.mean(row[name])
+
+    df["fluctuation_all"] = df.apply(lambda x: mean_per_row(x,"fluctuation_all"),axis=1)
+    df["fluctuation_pf"] = df.apply(lambda x: mean_per_row(x,"fluctuation_pf"),axis=1)
+    df["fluctuation_tf"] = df.apply(lambda x: mean_per_row(x,"fluctuation_tf"),axis=1)
+
+    df_temp = (df.groupby(cols)[["actual_patterning_error","fluctuation_all", \
+            "fluctuation_pf","fluctuation_tf"]].mean())
+
+    dd = {}
+    for ix in df_temp.index.tolist():
+        dd[ix] = df_temp.iloc[[ix]].values.flatten().tolist()
+
+    ncol0 = len(df_temp.index.unique(level=cols[0]))
+    ncol1 = 4
+    axticklabs = ["none","all","PF","TF"]
+
+    barcolors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    color_dict = get_varname_to_color_dict()
+
+    labelloc = np.arange(len(axticklabs))
+    width = 0.25
+    multiplier = 0
+    for ii, (att, vals) in enumerate(dd.items()):
+        label = get_label([cols[0]],to_tuple(att),varnames_dict)
+        if label in color_dict.keys():
+            color = color_dict[label]
+        else:
+            color = barcolors[ii]
+        offset = width*multiplier
+        ax.bar(labelloc+offset,vals,width,label=label,color=color,edgecolor=color)
+        multiplier += 1
+
+    ax.set_ylabel(ylabel,wrap=True,fontsize=fontsize)
+    ax.set_xlabel("")
+
+    try:
+        ix = axticklabs[0].index("=")
+        ticklab_prefixes = [x[0:ix] for x in axticklabs]
+        
+        if len(set(ticklab_prefixes)) == 1:
+            if not axlabel:
+                axlabel = ticklab_prefixes[0][:-1]
+            axticklabs = [x[ix+2:] for x in axticklabs]
+    except:
+        pass
+
+    if not axlabel:
+        axlabel = f"{tuple(cols)}"
+    ax.set_xlabel(axlabel,wrap=True)
+
+    ax.set_xticks(labelloc + width*((ncol1-1)/2),axticklabs)
+    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
+    if bbox_to_anchor is None:
+        bbox_to_anchor = (0,0,1.0,1.0)
+    if not suppress_leg:
+        lg = ax.legend(loc=legloc,ncol=legncol,bbox_to_anchor=bbox_to_anchor,frameon=False,
+                       fontsize=round(LEG_FONT_RATIO*fontsize))
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    if not title == "":
+        ax.set_title(title,wrap=True,x=0.05,y=0.9,fontweight="bold",ha="left",fontsize=fontsize)
+
+    if not filename == "":
+        plt.rcParams.update({'font.size':24})
+        plt.savefig(filename)
+
+
 def boxplot_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[],ylabel=" ",axlabel=[],
                     axticklabrotation=45):
     gb = df.groupby(cols,group_keys=True)
@@ -1196,8 +1270,15 @@ def hist_fluctuations_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[
         labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
         cur_color = varname_to_color_dict[labtext]
 
-        fluctuation_patterning_errors = np.array(calc_rmse_with_fluctuations(gr,0.1,10).to_list()).flatten()
-        actual_patterning_error = np.array(rms_patterning_error(gr).to_list()).flatten()
+        if "fluctuation_all" in gr.columns:
+            fluctuation_patterning_errors = np.array(gr["fluctuation_all"].to_list()).flatten()
+        else:
+            fluctuation_patterning_errors = np.array(calc_rmse_with_fluctuations(gr,0.1,10).to_list()).flatten()
+
+        if "actual_patterning_error" in gr.columns:
+            actual_patterning_error = np.array(gr["actual_patterning_error"].to_list()).flatten()
+        else:
+            actual_patterning_error = np.array(rms_patterning_error(gr).to_list()).flatten()
 
         nbins = 10
         ax.hist(actual_patterning_error,nbins,color=0.5*cur_color,alpha=0.5,density=True)
@@ -1559,14 +1640,21 @@ def calc_modulating_concentrations(df):
 
 # Calculate RMSE when perturb multiplicatively from optimal concentration as
 # c' = c_opt(1+normal(0,sigma^2))
-def calc_rmse_with_fluctuations(df,sigma,nrep):
+def calc_rmse_with_fluctuations(df,sigma,nrep,factor_type="all"):
+    print("Calculating RMSE with fluctuations...")
     def calc_one_row(row):
-        print(".")
+        print(".",end="",flush=True)
         f = manage_db.get_crosstalk_metric_from_row(row)
-        rmse = np.empty((nrep,1))
+        rmse = np.empty(nrep)
         for ii in range(nrep):
-            c_perturbed = np.multiply(row["optimized_input"], \
-                    1+np.random.normal(scale=sigma,size=row["optimized_input"].shape))
+            perturbation = np.random.normal(scale=sigma,size=row["optimized_input"].shape)
+            if factor_type == "tf":
+                perturbation[0:row["N_PF"]] = 0
+            elif factor_type == "pf":
+                perturbation[row["N_PF"]:] = 0
+
+            c_perturbed = np.multiply(row["optimized_input"],1+perturbation)
+            c_perturbed[c_perturbed < 0] = 0
             expression_perturbed = f([],c_perturbed[0:row["N_PF"]],c_perturbed[row["N_PF"]:],return_var="gene_exp")
             d = expression_perturbed - row["target_pattern"]
             d = d@d

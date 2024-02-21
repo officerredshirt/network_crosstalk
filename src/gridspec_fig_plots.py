@@ -775,11 +775,11 @@ def main(argv):
 
 
     if GEN_TEST:
+        df_filter = pandas.read_parquet("../fluctuation_res.pq")
+
         fig, ax = plt.subplots(2,3,figsize=(40,20),layout="tight")
 
-        #plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                               #(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                               #(df_normal["M_GENE"] == m_gene)],
+        #plot_db.subplots_groupby(df_filter.loc[(df_filter["layer2_repressors"] == 0)],
                                  #["ratio_KNS_KS"],
                                  #[],[],
                                  #plot_db.hist_fluctuations_groupby,
@@ -787,21 +787,17 @@ def main(argv):
                                  #fontsize=fntsz,ax=ax,
                                  #varnames_dict=varnames_dict)
 
-        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["minimize_noncognate_binding"] == 0) &
-                                        (df["target_independent_of_clusters"] == 0) &
-                                        (df["ignore_off_during_optimization"] == 0) &
-                                        (df["layer2_repressors"] == 1) &
-                                        (df["MIN_EXPRESSION"] > 0.01)],
+        plot_db.subplots_groupby(df_filter,
                                  ["ratio_KNS_KS"],
                                  [],[],
-                                 plot_db.hist_fluctuations_groupby,
+                                 plot_db.fluctuation_barchart_groupby,
                                  ["tf_first_layer"],
-                                 fontsize=fntsz,ax=ax,
+                                 ax=ax,
+                                 fontsize=fntsz,ylabel="GEE",
+                                 legloc="best",axlabel=" ",
                                  varnames_dict=varnames_dict)
 
-        plt.savefig("../plots/fig/test2.png")
+        plt.savefig("../plots/fig/test3.png")
         plt.close()
 
 if __name__ == "__main__":
