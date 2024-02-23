@@ -415,7 +415,7 @@ def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],
                           ax=[],ylabel="mean",fontsize=24,
                           legloc="upper right",axlabel=[],logxax=True,logyax=False,
                           suppress_leg=False,linewidth=3,markersize=15,take_ratio=False,
-                          color="black",force_color=False,
+                          color="black",force_color=False,markers=["o","D"],
                           xticks=None,yticks=None,legncol=1,**kwargs):
     if not ((len(cols) > 1) & (len(cols) < 4)):
         print("symbolscatter_groupby requires 2 or 3 cols")
@@ -451,12 +451,11 @@ def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],
 
     if len(vals_test.columns) == 2:
         ax.plot(vals_test[cols[0]].values,vals_test["temp_barchart_fn"].values,color=color,
-                linewidth=linewidth,marker="h",markersize=markersize)
+                linewidth=linewidth,marker=markers[0],markersize=markersize)
         #ax.plot(ratios[cols[0]].values,ratios["ratio"].values,color=color,
                 #linewidth=linewidth,marker="h",markersize=markersize)
     else:
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        markers = ["o","D"]
         color_dict = get_varname_to_color_dict()
 
 
@@ -602,7 +601,8 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
                             ylabel=[],fontsize=24,draw_lines=False,markeralpha=0.6,
                             suppress_leg=False,linewidth=2,normalize=False,
                             transform_columns=static_columns,legloc="lower left",
-                            logfit=False,**kwargs):
+                            logfit=False,force_color=False,markerdict={0:"o",1:"P"},
+                            **kwargs):
     gb = df.groupby(cols[0:2],group_keys=True)
 
     if not len(cols) == 4:
@@ -616,7 +616,6 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         sys.exit()
 
     #color_multiplier = np.linspace(1,0.2,ncol1)
-    marker_dict = {0:"o",1:"P"}
     def scatter_one(gr,sizenorm_lims):
         try:
             gr["temp_barchart_fn"] = f(gr)
@@ -644,11 +643,15 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
             sizes = (size_lims[1] + size_lims[0])/2.0
 
         label = get_label([cols[0]],to_tuple(gr.name[0]),varnames_dict)
-        color = get_color_from_label(label,mastercolor)
+        if force_color:
+            #color = mastercolor
+            color = 0.5*get_color_from_label(label,mastercolor)
+        else:
+            color = get_color_from_label(label,mastercolor)
         #color = color*color_multiplier[gr.name[1]]
 
         ax.scatter(vals_test[cols[3]],vals_test["temp_barchart_fn"],s=sizes,color=color,
-                   marker=marker_dict[gr.name[1]],clip_on=False,alpha=markeralpha,edgecolors="k",
+                   marker=markerdict[gr.name[1]],clip_on=False,alpha=markeralpha,edgecolors="k",
                    label=get_label([cols[1]],to_tuple(gr.name[1]),varnames_dict))
         if draw_lines:
             line_gb = vals_test.groupby(cols[2])
@@ -675,7 +678,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         markerlabs = [get_label([cols[1]],to_tuple(ii),varnames_dict) for ii in set(df[cols[1]])]
         colorlabs = [get_label([cols[0]],to_tuple(ii),varnames_dict) for ii in set(df[cols[0]])]
 
-        handles = [f(marker_dict[ii],"k") for ii in set(df[cols[1]])]
+        handles = [f(markerdict[ii],"k") for ii in set(df[cols[1]])]
         handles += [mpl.lines.Line2D([0],[0],color=get_color_from_label(x,mastercolor),lw=linewidth)
                     for x in colorlabs]
 
@@ -935,7 +938,6 @@ def fluctuation_barchart_groupby(df,cols,title="",filename="",varnames_dict=[],a
         multiplier += 1
 
     ax.set_ylabel(ylabel,wrap=True,fontsize=fontsize)
-    ax.set_xlabel("")
 
     try:
         ix = axticklabs[0].index("=")
@@ -1369,6 +1371,106 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
         ax.set_title(title,wrap=True,x=0.05,y=0.9,fontweight='bold',ha="left",fontsize=fontsize)
     if not filename == "":
         plt.savefig(filename)
+
+
+def scatter_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
+                                      fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
+                                      suppress_leg=False,normalize=False,gray_cb=False,**kwargs):
+    gb = df.groupby(cols,group_keys=True)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=(12*len(gb),24))
+
+    ncol1 = len(set(df[cols[0]]))
+    color_levels = np.linspace(0.2,1,ncol1).reshape(ncol1,1)
+    cur_color_list = color_levels * np.multiply(mastercolor,np.ones((1,3)))
+    if gray_first_level:
+        cur_color_list[0,:] = 0.6*np.array([1,1,1])
+    colordict = {}
+    for ii, lab in enumerate(gb.groups.keys()):
+        colordict[lab] = cur_color_list[ii]
+
+    def scatter_one(gr):
+        labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
+
+        if not len(markerdict.keys()) == 0:
+            cur_marker = markerdict[gr.name]
+        else:
+            cur_marker = 'o'
+        if not normalize:
+            tf_fluctuation_vals = np.array(gr["fluctuation_tf"].to_list()).flatten()
+            pf_fluctuation_vals = np.array(gr["fluctuation_pf"].to_list()).flatten()
+            ax.plot(tf_fluctuation_vals,pf_fluctuation_vals,cur_marker,ms=5,alpha=0.2,label=labtext,
+                    color=colordict[gr.name])
+        else:
+            tf_fluctuation_vals = get_mean_fluctuation(gr,"tf")
+            pf_fluctuation_vals = get_mean_fluctuation(gr,"pf")
+            all_fluctuation_vals = get_mean_fluctuation(gr,"all")
+            ax.plot(tf_fluctuation_vals/all_fluctuation_vals, \
+                    pf_fluctuation_vals/all_fluctuation_vals, \
+                    cur_marker,ms=7,alpha=0.5,label=labtext,
+                    color=colordict[gr.name])
+
+    gb.apply(scatter_one)
+
+    if not normalize:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        cur_xlims = ax.get_xlim()
+        cur_ylims = ax.get_ylim()
+
+        ax.set_xlabel("GEE (single-target)",fontsize=fontsize)
+        ax.set_ylabel("GEE (multi-target)",fontsize=fontsize)
+    else:
+        cur_xlims = ax.get_xlim()
+        cur_ylims = ax.get_ylim()
+        ax.set_xlabel("GEE (single-target) / GEE (all)",fontsize=fontsize)
+        ax.set_ylabel("GEE (multi-target) / GEE (all)",fontsize=fontsize)
+
+    ax.plot([0,1.5],[0,1.5],color="gray",linewidth=1,zorder=0)
+    ax.set_xlim(cur_xlims[0],cur_xlims[1])
+    ax.set_ylim(cur_ylims[0],1.1e-1)
+
+    ax.set_box_aspect(1)
+
+    if gray_cb:
+        cur_cmap = mpl.colors.ListedColormap(color_levels*np.multiply(0.8*np.ones((1,3)),np.ones((1,3))))
+    else:
+        cur_cmap = mpl.colors.ListedColormap(cur_color_list)
+    if (not suppress_leg) and colorbar_leg:
+        cb = plt.colorbar(plt.cm.ScalarMappable(cmap=cur_cmap),ax=ax,location='top')
+        cb.ax.get_xaxis().set_ticks([])
+    for j, lab in enumerate(gb.groups.keys()):
+        cur_label = f"{lab:.0f}"
+        if colorbar_leg:
+            cb.ax.text((2*j+1)/10.0,0.45,cur_label,ha='center',va='center',color='white',fontweight='bold')
+
+    try:
+        cb.ax.get_xaxis().labelpad = 15
+        cb.ax.set_xlabel(varnames_dict[cols[0]],fontsize=fontsize)
+    except Exception as e:
+        print(e)
+        pass
+
+    if (not suppress_leg) and (not colorbar_leg):
+        #lg = ax.legend(loc="upper center",markerscale=5,frameon=False,
+                       #bbox_to_anchor=(0.5,1.17))
+        lg = ax.legend(loc="lower right",markerscale=5,fontsize=round(LEG_FONT_RATIO*fontsize))
+        for lgh in lg.get_lines():
+            lgh.set_alpha(1)
+            lgh.set_marker('.')
+        #cb.remove()
+
+    ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
+
+    if not title == "":
+        ax.set_title(title,wrap=True,x=0.05,y=0.9,fontweight='bold',ha="left",fontsize=fontsize)
+    if not filename == "":
+        plt.savefig(filename)
+
+
+def get_mean_fluctuation(x,fluc_type="all"):
+    return x.apply(lambda y: np.mean(y[f"fluctuation_{fluc_type}"]),axis=1)
 
 
 def scatter_repressor_activator(df,cols,title="",filename="",ax=(),fontsize=24,varnames_dict=[],**kwargs):
