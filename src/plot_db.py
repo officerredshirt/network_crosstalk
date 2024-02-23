@@ -1429,7 +1429,7 @@ def scatter_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[],ax
 
     ax.plot([0,1.5],[0,1.5],color="gray",linewidth=1,zorder=0)
     ax.set_xlim(cur_xlims[0],cur_xlims[1])
-    ax.set_ylim(cur_ylims[0],1.1e-1)
+    ax.set_ylim(cur_ylims[0],max(cur_ylims[1],1.1e-1))
 
     ax.set_box_aspect(1)
 

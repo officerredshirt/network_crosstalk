@@ -673,7 +673,7 @@ def main(argv):
                                  fontsize=fntsz,ax=[axd["D"]],
                                  varnames_dict=varnames_dict)
         axd["D"].set_xticks([1e-1,1e-2])
-        ax_inset = axd["D"].inset_axes((0.6,0.07,0.9*insetsz,0.9*insetsz))
+        ax_inset = axd["D"].inset_axes((0.55,0.08,insetsz,insetsz))
         plot_db.subplots_groupby(df_filter.loc[(df_filter["layer2_repressors"] == 0)],
                                  ["tf_first_layer"],
                                  [],[],
