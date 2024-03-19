@@ -601,7 +601,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
                             ylabel=[],fontsize=24,draw_lines=False,markeralpha=0.6,
                             suppress_leg=False,linewidth=2,normalize=False,
                             transform_columns=static_columns,legloc="lower left",
-                            logfit=False,force_color=False,markerdict={0:"o",1:"P"},
+                            logfit=False,darken_color=False,markerdict={0:"o",1:"P"},
                             **kwargs):
     gb = df.groupby(cols[0:2],group_keys=True)
 
@@ -643,7 +643,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
             sizes = (size_lims[1] + size_lims[0])/2.0
 
         label = get_label([cols[0]],to_tuple(gr.name[0]),varnames_dict)
-        if force_color:
+        if darken_color:
             #color = mastercolor
             color = 0.5*get_color_from_label(label,mastercolor)
         else:

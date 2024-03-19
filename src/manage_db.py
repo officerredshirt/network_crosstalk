@@ -67,9 +67,9 @@ def add_parameters(db_filename):
 
     col_insert_query = ",".join(param_names)
     param_values = [getattr(params,param) for param in param_names]
-    param_insert_query = ",".join([f"{x}" for x in param_values])
+    param_insert_query = ",".join(map(repr,param_values))
 
-    cur.execute(f"INSERT INTO parameters ({col_insert_query}) VALUES({param_insert_query})")
+    cur.execute("INSERT INTO parameters ({}) VALUES ({})".format(col_insert_query,param_insert_query))
 
     con.commit()
     con.close()
@@ -662,7 +662,9 @@ def partition_database(db_filename,N,folder_out):
         db_child = sqlite3.connect(cur_db_out)
         child_cur = db_child.cursor()
 
-        child_cur.executemany("INSERT INTO parameters VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",parameters)
+        param_qmarks = ",".join(['?' for i in range(len(parameters))])
+
+        child_cur.executemany("INSERT INTO parameters VALUES ({})".format(param_qmarks),parameters)
         child_cur.executemany("INSERT INTO networks VALUES(?,?,?,?,?)",networks)
 
         cur_patterns = [patterns[x] for x in indices_split[ii_partition]]

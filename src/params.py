@@ -13,6 +13,7 @@ ratio_KNS_KS = 1000
 layer1_static = False   # False if Layer 1 K_NS scales with same ratio as Layer 2
 target_independent_of_clusters = False  # True if target patterns defined independently from clusters
 layer2_repressors = True    # True if each gene controlled by 1 activator and 1 repressor, False if activators only
+target_distribution = "loguni" # "uniform", "loguni", "invloguni"
 
 # LAYER 1 (CHROMATIN)
 rp = 0

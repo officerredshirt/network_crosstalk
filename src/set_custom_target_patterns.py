@@ -40,7 +40,18 @@ def main(argv):
         n_active_clusters = random.randint(MIN_CLUSTERS_ACTIVE,MAX_CLUSTERS_ACTIVE+1)
 
         if target_independent_of_clusters:
-            target_pattern = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,M_GENE)
+            if target_distribution == "uni":
+                target_pattern = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,M_GENE)
+            elif target_distribution == "loguni":
+                exponent_vals = random.default_rng().uniform(np.log10(MIN_EXPRESSION),np.log10(MAX_EXPRESSION),M_GENE)
+                target_pattern = np.power(10,exponent_vals)
+            elif target_distribution == "invloguni":
+                exponent_vals = random.default_rng().uniform(np.log10(MIN_EXPRESSION),np.log10(MAX_EXPRESSION),M_GENE)
+                target_pattern = MAX_EXPRESSION - np.power(10,exponent_vals) + MIN_EXPRESSION
+            else:
+                print(f"unrecognized target distribution option {target_distribution}")
+                sys.exit()
+
             off_genes = random.choice(range(M_GENE),
                                       size=GENES_PER_CLUSTER*(N_CLUSTERS - n_active_clusters),
                                       replace=False)

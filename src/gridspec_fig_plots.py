@@ -17,8 +17,8 @@ HIGHLY_EXPRESSING_THRESHOLD = 0.8
 RATIO_FOR_SINGLE_EXAMPLES = 1000
 GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
-GEN_FIGURE_4 = False
-GEN_FIGURE_5 = True
+GEN_FIGURE_4 = True
+GEN_FIGURE_5 = False
 GEN_FIGURE_5_FORMER = False
 GEN_SUPPLEMENTAL = False
 GEN_TEST = False
@@ -409,7 +409,7 @@ def main(argv):
         axd["D"].set_xticks([0,xover_coord1,1])
         axd["D"].set_xticklabels(["0",f"{xover_coord1}","1"])
         xover_coord = 0.28
-        axd["E"].annotate("approx. leaky\nexpression level",xy=(xover_coord,0),xytext=(xover_coord,100),
+        axd["E"].annotate("approx. baseline\nexpression level",xy=(xover_coord,0),xytext=(xover_coord,100),
                           arrowprops=dict(arrowstyle="-",linewidth=2,edgecolor="k"),ha="center",
                           fontsize=round(0.75*fntsz))
         axd["E"].set_xticks([0,xover_coord,1])
@@ -607,7 +607,7 @@ def main(argv):
         axd["A"].set_yticks([1,10])
         axd["A"].set_xticks(S_xticks)
         # legend
-        handles = [Line2D([0],[0],color=x) for x in fluc_colors]
+        handles = [Line2D([0],[0],color=x,linewidth=2) for x in fluc_colors]
         axd["A"].legend(handles,["$\sigma$ = 0.05","$\sigma$ = 0.1","$\sigma$ = 0.2"],
                         frameon=False,handlelength=1,loc="lower left")
 
@@ -619,7 +619,7 @@ def main(argv):
                                  lambda x: x["actual_patterning_error"],
                                  ax=[axd["B"]],fontsize=fntsz,draw_lines=True,
                                  markeralpha=1,markerdict=repressor_markerdict,
-                                 force_color=True,
+                                 darken_color=True,
                                  size_lims=[500,500],suppress_leg=True,
                                  subtitles=[""],ylabel="GEE",
                                  varnames_dict=varnames_dict)
@@ -687,7 +687,7 @@ def main(argv):
         ax_inset.set_yticks([0,0.5,1])
         ax_inset.set_xlabel("")
         ax_inset.set_ylabel("")
-        ax_inset.set_title("normalized")
+        ax_inset.set_title("normalized\nGEE")
 
         plt.savefig(f"../plots/fig/fig5.png")
         plt.close()

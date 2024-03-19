@@ -7,10 +7,6 @@ import manage_db
 from params import *
 
 
-# TODO:
-# [ ] assign connections according to particular distributions
-# [ ] allow more than one gene per enhancer
-
 def main(argv):
 
     parser = argparse.ArgumentParser(
