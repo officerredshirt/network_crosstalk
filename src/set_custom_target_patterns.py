@@ -31,27 +31,25 @@ def main(argv):
     # generate target patterns where ON genes have random expression level
     # between MIN_EXPRESSION and MAX_EXPRESSION
     for ii in range(NUM_TARGETS):
-        target_pattern = zeros(M_GENE)
-
         # PFs and TFs that are present to generate this pattern
         u = [False]*(N_PF+N_TF)
 
         # randomly choose number active clusters
         n_active_clusters = random.randint(MIN_CLUSTERS_ACTIVE,MAX_CLUSTERS_ACTIVE+1)
 
-        if target_independent_of_clusters:
-            if target_distribution == "uni":
-                target_pattern = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,M_GENE)
-            elif target_distribution == "loguni":
-                exponent_vals = random.default_rng().uniform(np.log10(MIN_EXPRESSION),np.log10(MAX_EXPRESSION),M_GENE)
-                target_pattern = np.power(10,exponent_vals)
-            elif target_distribution == "invloguni":
-                exponent_vals = random.default_rng().uniform(np.log10(MIN_EXPRESSION),np.log10(MAX_EXPRESSION),M_GENE)
-                target_pattern = MAX_EXPRESSION - np.power(10,exponent_vals) + MIN_EXPRESSION
-            else:
-                print(f"unrecognized target distribution option {target_distribution}")
-                sys.exit()
+        if target_distribution == "uni":
+            target_pattern = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,M_GENE)
+        elif target_distribution == "loguni":
+            exponent_vals = random.default_rng().uniform(log10(MIN_EXPRESSION),log10(MAX_EXPRESSION),M_GENE)
+            target_pattern = power(10,exponent_vals)
+        elif target_distribution == "invloguni":
+            exponent_vals = random.default_rng().uniform(log10(MIN_EXPRESSION),log10(MAX_EXPRESSION),M_GENE)
+            target_pattern = MAX_EXPRESSION - power(10,exponent_vals) + MIN_EXPRESSION
+        else:
+            print(f"unrecognized target distribution option {target_distribution}")
+            sys.exit()
 
+        if target_independent_of_clusters:
             off_genes = random.choice(range(M_GENE),
                                       size=GENES_PER_CLUSTER*(N_CLUSTERS - n_active_clusters),
                                       replace=False)
@@ -62,7 +60,8 @@ def main(argv):
             # randomly assign expression levels to genes in clusters
             n_active_genes = GENES_PER_CLUSTER*n_active_clusters
             u[N_PF:N_PF+n_active_genes] = [True]*n_active_genes
-            target_pattern[0:n_active_genes] = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,n_active_genes)
+            #target_pattern[0:n_active_genes] = random.default_rng().uniform(MIN_EXPRESSION,MAX_EXPRESSION,n_active_genes)
+            target_pattern[n_active_genes:] = 0
         
         manage_db.add_pattern(database,local_id,array(u),target_pattern)
 

@@ -6,6 +6,8 @@ import manage_db
 import plot_db
 import sys, argparse
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 
 def main(argv):
     parser = argparse.ArgumentParser(
@@ -29,11 +31,11 @@ def main(argv):
 
 
     print("PARAMETERS")
-    manage_db.print_res(database,"parameters")
+    #manage_db.print_res(database,"parameters")
     print("")
 
     print("NETWORKS")
-    manage_db.print_res(database,"networks")
+    #manage_db.print_res(database,"networks")
     print("")
 
     print("PATTERNS")
@@ -43,6 +45,12 @@ def main(argv):
     print("XTALK")
     #manage_db.print_res(database,"xtalk")
     print("")
+
+    target_patterns = np.array(list(manage_db.get_target_patterns(database,0)[1])).flatten()
+    fig, ax = plt.subplots()
+    ax.hist(target_patterns[target_patterns >= 0])
+    plt.savefig("target_dist_test.png")
+
 
 
 if __name__ == "__main__":

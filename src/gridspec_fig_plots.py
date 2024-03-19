@@ -17,11 +17,12 @@ HIGHLY_EXPRESSING_THRESHOLD = 0.8
 RATIO_FOR_SINGLE_EXAMPLES = 1000
 GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
-GEN_FIGURE_4 = True
+GEN_FIGURE_4 = False
 GEN_FIGURE_5 = False
 GEN_FIGURE_5_FORMER = False
 GEN_SUPPLEMENTAL = False
-GEN_TEST = False
+GEN_NOISE = False
+GEN_TEST = True
 
 pandas.options.mode.chained_assignment = None
 
@@ -804,7 +805,7 @@ def main(argv):
         plt.close()
 
 
-    if GEN_TEST:
+    if GEN_NOISE:
         sigma = 0.1
         df_filter = pandas.read_parquet(f"../fluctuation_res_sigma{sigma}.pq")
 
@@ -957,6 +958,9 @@ def main(argv):
 
         plt.savefig(f"../plots/fig/test_sigma{sigma}.png")
         plt.close()
+
+    if GEN_TEST:
+        pass
 
 if __name__ == "__main__":
     main(sys.argv[1:])
