@@ -662,7 +662,7 @@ def partition_database(db_filename,N,folder_out):
         db_child = sqlite3.connect(cur_db_out)
         child_cur = db_child.cursor()
 
-        param_qmarks = ",".join(['?' for i in range(len(parameters))])
+        param_qmarks = ",".join(['?' for i in range(len(parameters[0]))])
 
         child_cur.executemany("INSERT INTO parameters VALUES ({})".format(param_qmarks),parameters)
         child_cur.executemany("INSERT INTO networks VALUES(?,?,?,?,?)",networks)
@@ -782,6 +782,16 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
     def crosstalk_metric(x,c_PF,c_TF,return_var="metric",concentration_penalty=False,cp=[],
                          ignore_off_for_opt=False,off_ixs=[]):
         if not layer2_repressors:
+            def get_pr_open(c_PF,c_TF):
+                C_PF = sum(c_PF)
+                C_TF = sum(c_TF)
+                if crosslayer_crosstalk:
+                    pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])
+                else:
+                    pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])
+
+                return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
+
             def get_gene_exp(c_PF,c_TF):
                 C_PF = sum(c_PF)
                 C_TF = sum(c_TF)
@@ -810,6 +820,29 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
                 
                 return np.column_stack((chromatin_error,tf_error,total_error))
         else:
+            def get_pr_open(c_PF,c_TF):
+                N_A = int(len(c_TF)/2)
+                c_A = c_TF[0:N_A]
+                c_R = c_TF[N_A:]
+
+                C_PF = sum(c_PF)
+                C_A = sum(c_A)
+                C_R = sum(c_R)
+
+                if crosslayer_crosstalk:
+                    if tf_first_layer:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_A,c_PF[r],C_R)
+                    else:
+                        print("currently do not support layer2_repressors with chromatin and crosslayer xtalk")
+                        sys.exit()
+                else:
+                    if not tf_first_layer:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])
+                    else:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r],0)
+
+                return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
+
             def get_gene_exp(c_PF,c_TF):
                 N_A = int(len(c_TF)/2)
                 c_A = c_TF[0:N_A]
@@ -837,40 +870,15 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
                 return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
 
 
-            # CURRENTLY DO NOT SUPPORT ERROR FRAC
+            # CURRENTLY DO NOT SUPPORT ERROR FRAC WHEN REPRESSORS PRESENT
             def get_error_frac(c_PF,c_TF):
-                #N_A = int(len(c_TF)/2)
-                #c_A = c_TF[0:N_A]
-                #c_R = c_TF[N_A:]
-
-                #C_PF = sum(c_PF)
-                #C_A = sum(c_A)
-                #C_R = sum(c_R)
-
-                #if crosslayer_crosstalk:
-                    #if tf_first_layer:
-                        #E1 = lambda r: pr_chromatin_error(C_PF+C_TF,c_PF[r],C_R)
-                        #E2 = lambda t: pr_tf_error(C_A+C_PF,c_A[t],C_R,c_R[t])
-                    #else:
-                        #print("currently do not support layer2_repressors with chromatin and crosslayer xtalk")
-                        #sys.exit()
-                #else:
-                    #if not tf_first_layer:
-                        #E1 = lambda r: pr_chromatin_error(C_PF,c_PF[r])
-                    #else:
-                        #E1 = lambda r: pr_chromatin_error(C_PF,c_PF[r],0)
-                    #E2 = lambda t: pr_tf_error(C_A,c_A[t],C_R,c_R[t])
-
-                #chromatin_error = np.concatenate(list(map(E1,R_bool)))
-                #tf_error = np.concatenate(list(map(E2,T_bool)))
-                #total_error = chromatin_error + tf_error - chromatin_error*tf_error
-
-                #return np.column_stack((chromatin_error,tf_error,total_error))
                 return np.array(float('NaN'))
 
 
         if return_var == "gene_exp":
             return get_gene_exp(c_PF,c_TF)
+        elif return_var == "pr_open":
+            return get_pr_open(c_PF,c_TF)
         elif return_var == "error_frac":
             return get_error_frac(c_PF,c_TF)
         elif return_var == "max_expression":

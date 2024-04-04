@@ -46,11 +46,6 @@ def main(argv):
     #manage_db.print_res(database,"xtalk")
     print("")
 
-    target_patterns = np.array(list(manage_db.get_target_patterns(database,0)[1])).flatten()
-    fig, ax = plt.subplots()
-    ax.hist(target_patterns[target_patterns >= 0])
-    plt.savefig("target_dist_test.png")
-
 
 
 if __name__ == "__main__":
