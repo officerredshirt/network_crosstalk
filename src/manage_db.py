@@ -946,7 +946,7 @@ def get_crosstalk_metric_from_row(row):
             row["layer2_repressors"],os.path.dirname(row["filename"]))
 
 
-def get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder):
+def get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder,sigma_PF=0,sigma_TF=0,nsamp=10):
     local_id = extract_local_id(filename_in)
 
     # load architecture

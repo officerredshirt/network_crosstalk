@@ -2,7 +2,7 @@ import datetime
 
 IDS = [f"{0:06}"] # NOTE this is hard-coded in later
 
-DIR = "/mnt/c/Users/mindylp/Documents/python/network_crosstalk/"
+DIR = "/mnt/c/Users/Melinda/Documents/python/network_crosstalk/"
 RESDIR = DIR+"res/"
 
 DATABASE_PATH = RESDIR + "local_db.db"
