@@ -43,12 +43,12 @@ def get_varname_to_value_dict(df):
                     ("tf_first_layer",0):"chromatin",
                     ("tf_first_layer",1):"free DNA",
                     "tf_first_layer":"TF first layer",
-                    ("target_independent_of_clusters",0):"aligned",#"OFF genes aligned\nwith clusters",
+                    ("target_independent_of_clusters",0):"matched",#"OFF genes aligned\nwith clusters",
                     ("target_independent_of_clusters",1):"shuffled",#"OFF genes unaligned\nwith clusters",
                     ("ignore_off_during_optimization",0):"globally optimal",
                     ("ignore_off_during_optimization",1):"optimal for ON genes",
-                    ("layer2_repressors",0):"activators only",
-                    ("layer2_repressors",1):"with repressors",
+                    ("layer2_repressors",0):"A",
+                    ("layer2_repressors",1):"A+R",
                     ("target_distribution","uni"):"uniform",
                     ("target_distribution","loguni"):"biased\nlow",
                     ("target_distribution","invloguni"):"biased\nhigh"}
@@ -666,7 +666,8 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         label = get_label([cols[0]],to_tuple(gr.name[0]),varnames_dict)
         if darken_color:
             #color = mastercolor
-            color = 0.5*get_color_from_label(label,mastercolor)
+            #color = 0.5*get_color_from_label(label,mastercolor)
+            color = to_grayscale(get_color_from_label(label,mastercolor))
         else:
             color = get_color_from_label(label,mastercolor)
         #color = color*color_multiplier[gr.name[1]]
@@ -1359,7 +1360,8 @@ def hist_fluctuations_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[
 
 def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
                                       fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
-                                      suppress_leg=False,color_list=[],legloc="lower right",**kwargs):
+                                      suppress_leg=False,color_list=[],legloc="lower right",
+                                      set_box_aspect=True,**kwargs):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -1407,7 +1409,8 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
     ax.set_ylim(0,1)
     ax.set_xticks([0,0.5,1])
     ax.set_yticks([0.5,1])
-    ax.set_box_aspect(1)
+    if set_box_aspect:
+        ax.set_box_aspect(1)
 
     cur_cmap = mpl.colors.ListedColormap(color_list)
     if (not suppress_leg) and colorbar_leg:
@@ -1454,9 +1457,10 @@ def calc_pr_open(df,col):
     return df.apply(per_row,axis=1)
         
 
-def scatter_pf_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
-                                      fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
-                                      suppress_leg=False,color_list=[],legloc="lower right",**kwargs):
+def scatter_pr_on_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[],ax=[],mastercolor=[],
+                                fontsize=24,colorbar_leg=True,gray_first_level=False,markerdict={},
+                                suppress_leg=False,color_list=[],legloc="lower right",
+                                factors="pf",**kwargs):
     gb = df.groupby(cols,group_keys=True)
 
     if not ax:
@@ -1480,9 +1484,12 @@ def scatter_pf_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[]
     for ii, lab in enumerate(gb.groups.keys()):
         colordict[lab] = color_list[ii]
 
-    def get_concentrations_per_row(row):
+    def get_concentrations_per_row(row,factor="pf"):
         cur_conc = np.array(row["optimized_input"])
-        return cur_conc[0:row["N_PF"]]
+        if factor == "pf":
+            return cur_conc[0:row["N_PF"]]
+        else:
+            return cur_conc[row["N_PF"]:]
 
     ax_inset_left = ax.inset_axes((-0.12,0,0.1,1))
     ax_inset_bottom = ax.inset_axes((0,-0.12,1,0.1))
@@ -1494,75 +1501,97 @@ def scatter_pf_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[]
         else:
             cur_marker = 'o'
 
-        concentration_vals = np.array(gr[["N_PF","optimized_input"]].parallel_apply(get_concentrations_per_row,axis=1).to_list()).flatten()
-        pr_open = np.array(gr["frac_time_layer1_on"].to_list()).flatten()
-        ax.plot(concentration_vals,pr_open,cur_marker,ms=5,alpha=0.2,label=labtext,color=colordict[gr.name])
+        if factors == "pf":
+            concentration_vals = np.array(gr[["N_PF","optimized_input"]].parallel_apply(get_concentrations_per_row,axis=1).to_list()).flatten()
+            pr_on = np.array(gr["frac_time_layer1_on"].to_list()).flatten()
+        elif factors == "tf":
+            concentration_vals = np.array(gr[["N_PF","optimized_input"]].parallel_apply(lambda x: get_concentrations_per_row(x,factor="tf"),axis=1).to_list()).flatten()
+            pr_on = gr.apply(lambda x: np.divide(x["output_expression"], \
+                    np.repeat(x["frac_time_layer1_on"],round(x["M_GENE"]/x["N_PF"]))),axis=1)
+            pr_on = np.array(pr_on.to_list()).flatten()
+        else:
+            print(f"factors must be pf or tf")
+            sys.exit()
+
+        ax.plot(concentration_vals,pr_on,cur_marker,ms=5,alpha=0.2,label=labtext,color=colordict[gr.name])
 
         # PLOT FUNCTIONS ALONG AXES
         cmin = np.min(concentration_vals[concentration_vals > 0])
         cmax = np.max(concentration_vals)
         samples = np.linspace(cmin,cmax,1000)
         ix2use = concentration_vals > 0
-        g = scipy.interpolate.interp1d(concentration_vals[ix2use],pr_open[ix2use],kind="slinear",
+        g = scipy.interpolate.interp1d(concentration_vals[ix2use],pr_on[ix2use],kind="slinear",
                                        bounds_error=False)
-        ginv = scipy.interpolate.interp1d(pr_open[ix2use],concentration_vals[ix2use],kind="slinear",
+        ginv = scipy.interpolate.interp1d(pr_on[ix2use],concentration_vals[ix2use],kind="slinear",
                                        bounds_error=False)
         ysamples = np.linspace(g(cmin),g(cmax),1000)
         ax.plot(ginv(ysamples),ysamples,linewidth=2,color="k")
 
-        def plot_distributions(sigma,cprime_center,color,s=22):
+        def plot_distributions(sigma,cprime_center,color,s=4):
+            if factors == "tf" and gr.iloc[0]["layer2_repressors"]:
+                print("error: option tf only works when no layer2 repressors")
+                sys.exit()
+
             # use noise c' = c_opt(1+normal(0,sigma^2))
             cprime_dist = lambda x: (1/(cprime_center*sigma*np.sqrt(2*math.pi))) * \
                     np.exp(-0.5*np.square((x-cprime_center)/(cprime_center*sigma)))
 
             ax_inset_bottom.plot(samples,cprime_dist(samples),linewidth=3,color=color)
 
-            pr_open_dist = lambda y: cprime_dist(ginv(y))*abs(np.gradient(ginv(y)))
-            pr_open_dist2plt = scipy.signal.savgol_filter(pr_open_dist(ysamples),s,4,mode="nearest")
-            pr_open_dist_fit = scipy.interpolate.interp1d(ysamples,pr_open_dist2plt,kind="slinear",
+            pr_on_dist = lambda y: cprime_dist(ginv(y))*abs(np.gradient(ginv(y),y[1]-y[0]))
+            pr_on_dist2plt = scipy.ndimage.gaussian_filter1d(pr_on_dist(ysamples),s)
+            pr_on_dist_fit = scipy.interpolate.interp1d(ysamples,pr_on_dist2plt,kind="slinear",
                                                           bounds_error=False)
-            ax_inset_left.plot(pr_open_dist2plt,ysamples,linewidth=3,color=color)
+            ax_inset_left.plot(pr_on_dist2plt,ysamples,linewidth=3,color=color)
 
             c_for_labeling = cprime_center*(1+np.array([-sigma,sigma]))
             for c in c_for_labeling:
                 con1 = mpl.patches.ConnectionPatch(xyA=(c,cprime_dist(c)),coordsA=ax_inset_bottom.transData, \
                         xyB=(c,g(c)),coordsB=ax.transData,color=color,linestyle="dashed",linewidth=2)
-                con2 = mpl.patches.ConnectionPatch(xyA=(pr_open_dist_fit(g(c)),g(c)), \
+                con2 = mpl.patches.ConnectionPatch(xyA=(pr_on_dist_fit(g(c)),g(c)), \
                         coordsA=ax_inset_left.transData, \
                         xyB=(c,g(c)),coordsB=ax.transData,color=color,linestyle="dashed",linewidth=2)
                 ax_inset_bottom.add_artist(con1)
                 ax_inset_left.add_artist(con2)
 
         if not gr.iloc[0]["tf_first_layer"]:
-            s_vals = [80,40]
-            ax_inset_left.set_ylabel("fraction time accessible",fontsize=fontsize)
+            if factors == "pf":
+                ax_inset_left.set_ylabel("fraction time accessible",fontsize=fontsize)
+                s = 4
+            else:
+                ax_inset_left.set_ylabel("fraction time bound",fontsize=fontsize)
+                s = 10
         else:
-            s_vals = [240,100]
             ax_inset_left.set_ylabel("fraction time bound",fontsize=fontsize)
+            s = 8
+
         c_vals = np.quantile(concentration_vals[concentration_vals > 0],[0.20,0.80])
         colors = [[0.2,0.2,0.2],[0.7,0.7,0.7]]
         for ii, c_center in enumerate(c_vals):
-            plot_distributions(0.1,c_center,color=colors[ii],s=s_vals[ii])
+            plot_distributions(0.1,c_center,color=colors[ii],s=s)
 
 
     gb.apply(scatter_one)
 
-    xlims = ax.get_xlim()
-    ylims = [0.7,1]
+    if factors == "pf":
+        xlims = ax.get_xlim()
+        ylims = [0.6,1]
+        ax_inset_bottom.set_xlabel("[multi-target factor]",fontsize=fontsize)
+    else:
+        xlims = [0,100]
+        ylims = [0,1]
+        ax_inset_bottom.set_xlabel("[single-target factor]",fontsize=fontsize)
 
     ax.set_ylim(ylims[0],ylims[1])
     ax.set_xlim([0,round(xlims[-1]/10)*10])
     ax.set_xticks([0,ax.get_xlim()[1]])
     ax.set_yticks(ylims)
-    #ax.set_xticks([])
-    #ax.set_yticks([])
-    ax.set_box_aspect(1)
+    #ax.set_box_aspect(1)
 
-    ax_inset_left.invert_xaxis()
     ax_inset_left.set_xticks([])
+    ax_inset_left.invert_xaxis()
     ax_inset_left.set_ylim(ax.get_ylim())
     ax_inset_left.set_yticks([])
-    #ax_inset_left.set_yticks(ylims)
 
     ax_inset_left.set_xticks([])
     ax_inset_left.spines["top"].set_visible(False)
@@ -1571,9 +1600,8 @@ def scatter_pf_fluctuation_groupby(df,cols,title="",filename="",varnames_dict=[]
     ax_inset_left.spines["left"].set_visible(False)
     ax_inset_left.patch.set_visible(False)
 
-    ax_inset_bottom.set_xlabel("[multi-target factor]",fontsize=fontsize)
-    ax_inset_bottom.invert_yaxis()
     ax_inset_bottom.set_xlim(ax.get_xlim())
+    ax_inset_bottom.invert_yaxis()
     ax_inset_bottom.set_xticks([])
     ax_inset_bottom.set_yticks([])
 
@@ -1755,7 +1783,8 @@ def scatter_repressor_activator(df,cols,title="",filename="",ax=(),fontsize=24,v
     ax.set_xticks([0,0.5,1])
     #ax.set_box_aspect(1)
 
-    lg = ax.legend(loc="upper left",markerscale=3,fontsize=round(LEG_FONT_RATIO*fontsize),frameon=False)
+    lg = ax.legend(loc="upper left",markerscale=3,fontsize=round(LEG_FONT_RATIO*fontsize),frameon=False, \
+            handletextpad=0.2)
     ax.tick_params(axis="both",labelsize=round(TICK_FONT_RATIO*fontsize))
 
     if not title == "":

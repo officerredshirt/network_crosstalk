@@ -56,7 +56,9 @@ def main(argv):
     input_for_target, target_patterns = manage_db.get_target_patterns(database,local_id)
 
     # load crosstalk metric
-    crosstalk_metric = manage_db.get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder)
+    crosstalk_metric = manage_db.get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF, \
+            crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder, \
+            sigma_PF=sigma_PF,sigma_TF=sigma_TF,nsamp=nsamp)
 
     if npatterns > len(target_patterns):
         npatterns = len(target_patterns)

@@ -14,6 +14,10 @@ layer1_static = False   # False if Layer 1 K_NS scales with same ratio as Layer 
 target_independent_of_clusters = False  # True if target patterns defined independently from clusters
 layer2_repressors = True    # True if each gene controlled by 1 activator and 1 repressor, False if activators only
 target_distribution = "invloguni" # "uni", "loguni", "invloguni"
+sigma = 0.1     # magnitude of fluctuations; ignored if 0
+sigma_PF = sigma
+sigma_TF = sigma
+nsamp = 10      # number of samples per evaluation of stochastic objective fn; ignored if sigma = 0
 
 # LAYER 1 (CHROMATIN)
 rp = 0

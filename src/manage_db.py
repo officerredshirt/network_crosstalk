@@ -752,7 +752,8 @@ def append_db(db_parent_filename,db_filename):
 
 
 def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
-        crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder):
+        crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors, \
+        model_folder,sigma_PF=0,sigma_TF=0,nsamp=10):
     assert N_PF > 0, "get_crosstalk_metric does not support N_PF = 0"
     # pr_tf_bound is imported with tf_binding_equilibrium
     if tf_first_layer:
@@ -876,7 +877,22 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
 
 
         if return_var == "gene_exp":
-            return get_gene_exp(c_PF,c_TF)
+            if (sigma_PF == 0) and (sigma_TF == 0):
+                return get_gene_exp(c_PF,c_TF)
+            else:
+                c_PF_delta = np.random.normal(scale=sigma_PF,size=(len(c_PF),nsamp))
+                c_TF_delta = np.random.normal(scale=sigma_TF,size=(len(c_TF),nsamp))
+
+                favg = 0
+                for ii in range(nsamp):
+                    c_PF_fluc = np.multiply(c_PF,1+c_PF_delta[:,ii])
+                    c_PF_fluc[c_PF_fluc < 0] = 0
+
+                    c_TF_fluc = np.multiply(c_TF,1+c_TF_delta[:,ii])
+                    c_TF_fluc[c_TF_fluc < 0] = 0
+
+                    favg = favg + get_gene_exp(c_PF_fluc,c_TF_fluc)/nsamp
+                return favg
         elif return_var == "pr_open":
             return get_pr_open(c_PF,c_TF)
         elif return_var == "error_frac":
