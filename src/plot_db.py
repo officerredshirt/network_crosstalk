@@ -1128,6 +1128,16 @@ def expression_distribution_groupby(df,cols,title="",filename="",varnames_dict=[
         ax.hist(chromatin_actual_exp[chromatin_target_vals > 0],bins=nbins,alpha=0.25,density=True,color=color_dict["chromatin"],label="chromatin")
         ax.hist(freeDNA_actual_exp[freeDNA_target_vals > 0],bins=nbins,alpha=0.25,density=True,color=color_dict["free DNA"],label="free DNA")
 
+        ax_inset_right = ax.inset_axes((1,0,0.25,1))
+        subplots_groupby(gr.reset_index(),["ratio_KNS_KS"],[],[], \
+                rms_barchart_groupby,["target_distribution","tf_first_layer"], \
+                ax=[ax_inset_right],fontsize=fontsize, \
+                subtitles=[" "],axlabel=" ",ylabel=" ", \
+                colorbar_leg=False,suppress_leg=True, \
+                varnames_dict=varnames_dict)
+        ax_inset_right.set_ylim([0,0.08])
+        ax_inset_right.axis("off")
+
     gb.apply(plot_one)
 
     ax.set_xlabel("expression")

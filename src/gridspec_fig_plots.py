@@ -19,9 +19,9 @@ matplotlib.use("agg")
 
 HIGHLY_EXPRESSING_THRESHOLD = 0.8
 RATIO_FOR_SINGLE_EXAMPLES = 1000
-GEN_FIGURE_2 = True
+GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
-GEN_FIGURE_4 = False
+GEN_FIGURE_4 = True
 GEN_FIGURE_5 = False
 GEN_FIGURE_5_FORMER = False
 GEN_SUPPLEMENTAL = False
@@ -475,29 +475,52 @@ def main(argv):
     if GEN_FIGURE_4:
         fig = plt.figure(figsize=(30,16),layout="tight")
 
-        outer = gs.GridSpec(2,1,height_ratios=[3,1])
+        outer = gs.GridSpec(2,1,height_ratios=[5,1])
         top = gs.GridSpecFromSubplotSpec(1,2,subplot_spec=outer[0],width_ratios=[1,0.55],wspace=0.15)
-        left = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=top[0],height_ratios=[1,1.25])
+        left = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=top[0],height_ratios=[1.2,1],hspace=0.15)
         metrics = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=left[1],wspace=0.55)
         extended_scatter = gs.GridSpecFromSubplotSpec(2,2,subplot_spec=top[1],height_ratios=[1.5,1],
                                                     wspace=0.07,hspace=0.15)
-        on_distributions = gs.GridSpecFromSubplotSpec(1,2,subplot_spec=outer[1],width_ratios=[3.2,1],
+        """
+        on_distributions = gs.GridSpecFromSubplotSpec(1,4,subplot_spec=outer[1],width_ratios=[3.2,1,3.2,1],
                                                       wspace=0.15)
-        on_histograms = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=on_distributions[0],
+        A_histograms = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=on_distributions[0],
                                                    wspace=0.05)
+        AR_histograms = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=on_distributions[2],
+                                                   wspace=0.05)
+        """
+        histograms = gs.GridSpecFromSubplotSpec(1,8,subplot_spec=outer[1],wspace=0.5, \
+                width_ratios=[1,1,1,0.001,1,1,1,0.001])
 
         extended = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=outer[1],height_ratios=[1,1.5])
-        axd = {"A":plt.subplot(extended_scatter[0]),
+        axd = {"schematic":plt.subplot(left[0]),
+               "A":plt.subplot(extended_scatter[0]),
                "B":plt.subplot(extended_scatter[1]),
                "C":plt.subplot(metrics[0]),
-               "K":plt.subplot(metrics[1]),
+               "Ca":plt.subplot(metrics[1]),
                "D":plt.subplot(extended_scatter[2]),
                "E":plt.subplot(extended_scatter[3]),
                "F":plt.subplot(metrics[2]),
-               "G":plt.subplot(on_histograms[0]),
-               "H":plt.subplot(on_histograms[1]),
-               "I":plt.subplot(on_histograms[2]),
-               "J":plt.subplot(on_distributions[1])}
+               "G":plt.subplot(histograms[0]),
+               "H":plt.subplot(histograms[1]),
+               "I":plt.subplot(histograms[2]),
+               "K":plt.subplot(histograms[4]),
+               "L":plt.subplot(histograms[5]),
+               "M":plt.subplot(histograms[6])}
+        """
+               "G":plt.subplot(A_histograms[0]),
+               "H":plt.subplot(A_histograms[1]),
+               "I":plt.subplot(A_histograms[2]),
+               "J":plt.subplot(on_distributions[1]),
+               "K":plt.subplot(AR_histograms[0]),
+               "L":plt.subplot(AR_histograms[1]),
+               "M":plt.subplot(AR_histograms[2]),
+               "N":plt.subplot(on_distributions[3])}
+        """
+
+        repressor_schematic = mpimg.imread("../plots/fig/repressor_schematic2.png")
+        axd["schematic"].imshow(repressor_schematic)
+        axd["schematic"].axis("off")
 
         plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
                                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
@@ -712,7 +735,7 @@ def main(argv):
                                  plot_db.symbolscatter_groupby,
                                  ["ratio_KNS_KS","layer2_repressors"],
                                  plot_db.rms_patterning_error,
-                                 ax=[axd["K"]],suppress_leg=True,
+                                 ax=[axd["Ca"]],suppress_leg=True,
                                  subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
                                  take_ratio=True,logyax=True,
                                  force_color=True,color=plot_db.color_dict["chromatin"],
@@ -731,15 +754,15 @@ def main(argv):
                                  plot_db.symbolscatter_groupby,
                                  ["ratio_KNS_KS","layer2_repressors"],
                                  plot_db.rms_patterning_error,
-                                 ax=[axd["K"]],suppress_leg=True,
+                                 ax=[axd["Ca"]],suppress_leg=True,
                                  subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
                                  take_ratio=True,ylabel="GEE fold-reduction\nA+R / A",logyax=True,
                                  force_color=True,color=plot_db.color_dict["free DNA"],
                                  markers=["D"],reverse_ratio=True,
                                  varnames_dict=varnames_dict)
         axd["C"].set_ylim([pow(10,0),pow(10,1.5)])
-        axd["K"].set_ylim([pow(10,-0.25),10])
-        axd["K"].plot([1e2,1e4],[1,1],linewidth=1,color="black",linestyle="solid",zorder=0)
+        axd["Ca"].set_ylim([pow(10,-0.25),10])
+        axd["Ca"].plot([1e2,1e4],[1,1],linewidth=1,color="black",linestyle="solid",zorder=0)
         #labels=["f.D./c. (a.o.)","f.D./c. (w.r.)","a.o./w.r. (c.)","a.o/w.r. (f.D.)"]
         #axd["C"].legend(labels=labels,handlelength=1,ncol=2,columnspacing=0.8,
                         #fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),
@@ -803,7 +826,15 @@ def main(argv):
                                     bbox_to_anchor=(-0.15,1.02,1,0.1),loc=3)
         """
 
-        df_dist = df.loc[(df["M_GENE"] == m_gene) &
+        df_A_dist = df.loc[(df["M_GENE"] == m_gene) &
+                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                         (df["minimize_noncognate_binding"] == 0) &
+                         (df["target_independent_of_clusters"] == 0) &
+                         (df["ignore_off_during_optimization"] == 0) &
+                         (df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
+                         (df["layer2_repressors"] == 0) &
+                         (df["MIN_EXPRESSION"] < 0.01)]
+        df_AR_dist = df.loc[(df["M_GENE"] == m_gene) &
                          (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
                          (df["minimize_noncognate_binding"] == 0) &
                          (df["target_independent_of_clusters"] == 0) &
@@ -811,7 +842,7 @@ def main(argv):
                          (df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                          (df["layer2_repressors"] == 1) &
                          (df["MIN_EXPRESSION"] < 0.01)]
-        plot_db.subplots_groupby(df_dist,
+        plot_db.subplots_groupby(df_A_dist,
                                  ["target_distribution"],
                                  [],[],
                                  plot_db.expression_distribution_groupby,
@@ -821,11 +852,21 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         axd["H"].set_ylabel("")
         axd["I"].set_ylabel("")
+        plot_db.subplots_groupby(df_AR_dist,
+                                 ["target_distribution"],
+                                 [],[],
+                                 plot_db.expression_distribution_groupby,
+                                 ["M_GENE"],
+                                 ax=[axd["M"],axd["L"],axd["K"]],fontsize=fntsz,
+                                 subtitles=["","",""],
+                                 varnames_dict=varnames_dict)
+        axd["L"].set_ylabel("")
+        axd["M"].set_ylabel("")
         """
         ax_inset_g = axd["G"].inset_axes((0.03,0.4,biginsetsz,biginsetsz))
         ax_inset_h = axd["H"].inset_axes((0.5,0.4,biginsetsz,biginsetsz))
-        plot_db.subplots_groupby(df_dist.loc[(df_dist["tf_first_layer"] == True) &
-                                             (df_dist["target_distribution"] != "uni")],
+        plot_db.subplots_groupby(df_AR_dist.loc[(df_AR_dist["tf_first_layer"] == True) &
+                                             (df_AR_dist["target_distribution"] != "uni")],
                                  ["target_distribution"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
@@ -835,8 +876,8 @@ def main(argv):
                                  colorbar_leg = False,subtitles=["",""],
                                  suppress_leg=True,
                                  varnames_dict=varnames_dict)
-        plot_db.subplots_groupby(df_dist.loc[(df_dist["tf_first_layer"] == False) &
-                                             (df_dist["target_distribution"] != "uni")],
+        plot_db.subplots_groupby(df_AR_dist.loc[(df_AR_dist["tf_first_layer"] == False) &
+                                             (df_AR_dist["target_distribution"] != "uni")],
                                  ["target_distribution"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
@@ -849,10 +890,34 @@ def main(argv):
         adjust_inset(ax_inset_g,add_box=False)
         adjust_inset(ax_inset_h,add_box=False)
         """
+        axd["G"].get_legend().remove()
         axd["H"].get_legend().remove()
         axd["I"].get_legend().remove()
+        axd["K"].get_legend().remove()
+        axd["L"].get_legend().remove()
+        axd["M"].get_legend().remove()
 
-        plot_db.subplots_groupby(df_dist,
+        axd["G"].set_xlabel("")
+        axd["H"].set_xlabel("target expression")
+        axd["I"].set_xlabel("")
+        axd["K"].set_xlabel("")
+        axd["L"].set_xlabel("target expression")
+        axd["M"].set_xlabel("")
+
+        def label_axis(ax,text):
+            ax.text(0.1,0.9,text,va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),transform=ax.transAxes)
+        label_axis(axd["G"],"A")
+        label_axis(axd["H"],"A")
+        label_axis(axd["I"],"A")
+        label_axis(axd["K"],"A+R")
+        label_axis(axd["L"],"A+R")
+        label_axis(axd["M"],"A+R")
+
+        axd["G"].annotate("target",xy=(0.895,0.04),xytext=(0.7,0.4),xycoords="axes fraction",ha="center",
+                          arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
+
+        """
+        plot_db.subplots_groupby(df_A_dist,
                                  ["ratio_KNS_KS"],
                                  [],[],
                                  plot_db.rms_barchart_groupby,
@@ -864,11 +929,24 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         axd["J"].set_yticks([0,0.04,0.08])
 
-        plt.gcf().text(0.012,0.960,"A",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.630,0.962,"B",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.012,0.692,"C",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.630,0.600,"D",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.036,0.240,"E",fontsize=fntsz,fontweight="bold")
+        plot_db.subplots_groupby(df_AR_dist,
+                                 ["ratio_KNS_KS"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["target_distribution","tf_first_layer"],
+                                 ax=[axd["N"]],fontsize=fntsz,
+                                 subtitles=[""],axlabel=" ",
+                                 ylabel="GEE",
+                                 colorbar_leg=False,
+                                 varnames_dict=varnames_dict)
+        axd["N"].set_yticks([0,0.04,0.08])
+        """
+
+        plt.gcf().text(0.055,0.949,"A",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.630,0.956,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.055,0.590,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.630,0.558,"D",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.055,0.212,"E",fontsize=fntsz,fontweight="bold")
 
         plt.savefig("../plots/fig/fig4.png")
         plt.close()
