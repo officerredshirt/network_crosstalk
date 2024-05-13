@@ -875,24 +875,26 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
             def get_error_frac(c_PF,c_TF):
                 return np.array(float('NaN'))
 
+        def get_gene_exp_fluctuations(c_PF,c_TF):
+            c_PF_delta = np.random.normal(scale=sigma_PF,size=(len(c_PF),nsamp))
+            c_TF_delta = np.random.normal(scale=sigma_TF,size=(len(c_TF),nsamp))
+
+            favg = 0
+            for ii in range(nsamp):
+                c_PF_fluc = np.multiply(c_PF,1+c_PF_delta[:,ii])
+                c_PF_fluc[c_PF_fluc < 0] = 0
+
+                c_TF_fluc = np.multiply(c_TF,1+c_TF_delta[:,ii])
+                c_TF_fluc[c_TF_fluc < 0] = 0
+
+                favg = favg + get_gene_exp(c_PF_fluc,c_TF_fluc)/nsamp
+            return favg
 
         if return_var == "gene_exp":
             if (sigma_PF == 0) and (sigma_TF == 0):
                 return get_gene_exp(c_PF,c_TF)
             else:
-                c_PF_delta = np.random.normal(scale=sigma_PF,size=(len(c_PF),nsamp))
-                c_TF_delta = np.random.normal(scale=sigma_TF,size=(len(c_TF),nsamp))
-
-                favg = 0
-                for ii in range(nsamp):
-                    c_PF_fluc = np.multiply(c_PF,1+c_PF_delta[:,ii])
-                    c_PF_fluc[c_PF_fluc < 0] = 0
-
-                    c_TF_fluc = np.multiply(c_TF,1+c_TF_delta[:,ii])
-                    c_TF_fluc[c_TF_fluc < 0] = 0
-
-                    favg = favg + get_gene_exp(c_PF_fluc,c_TF_fluc)/nsamp
-                return favg
+                return get_gene_exp_fluctuations(c_PF,c_TF)
         elif return_var == "pr_open":
             return get_pr_open(c_PF,c_TF)
         elif return_var == "error_frac":
@@ -900,8 +902,13 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
         elif return_var == "max_expression":
             return max_expression
         elif return_var == "metric":
+            if (sigma_PF == 0) and (sigma_TF == 0):
+                gge = get_gene_exp
+            else:
+                gge = get_gene_exp_fluctuations
+
             if minimize_noncognate_binding:
-                gene_exp = get_gene_exp(c_PF,c_TF)
+                gene_exp = gge(c_PF,c_TF)
                 err_frac = get_error_frac(c_PF,c_TF)[:,2]
                 d1 = x - gene_exp*(1-err_frac)
                 d2 = gene_exp*err_frac
@@ -910,10 +917,11 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
                     d2[off_ixs] = 0
                 base = np.transpose(d1)@d1 + np.transpose(d2)@d2
             else:
-                d = x - get_gene_exp(c_PF,c_TF)
+                d = x - gge(c_PF,c_TF)
                 if ignore_off_for_opt:
                     d[off_ixs] = 0
                 base = np.transpose(d)@d
+
             if concentration_penalty:
                 return base + cp*(sum(c_PF) + sum(c_TF))
             else:
@@ -943,7 +951,8 @@ def get_crosstalk_metric_from_row(row):
 
     return get_crosstalk_metric(R,T,G,row["N_PF"],row["N_TF"], \
             row["crosslayer_crosstalk"],row["tf_first_layer"],row["minimize_noncognate_binding"], \
-            row["layer2_repressors"],os.path.dirname(row["filename"]))
+            row["layer2_repressors"],os.path.dirname(row["filename"]), \
+            row["sigma_PF"],row["sigma_TF"],row["nsamp"])
 
 
 def get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder,sigma_PF=0,sigma_TF=0,nsamp=10):
@@ -952,4 +961,4 @@ def get_crosstalk_metric_from_file(filename_in,database,N_PF,N_TF,crosslayer_cro
     # load architecture
     R, T, G = get_network(database,local_id)
 
-    return get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder)
+    return get_crosstalk_metric(R,T,G,N_PF,N_TF,crosslayer_crosstalk,tf_first_layer,minimize_noncognate_binding,layer2_repressors,model_folder,sigma_PF,sigma_TF,nsamp)

@@ -29,13 +29,14 @@ def get_varname_to_value_dict(df):
                     "K_NS":"$K_{NS}$",
                     "K_S":"$K_S$",
                     "M_GENE":"number of genes",
-                    "MAX_CLUSTERS_ACTIVE":"number of active clusters"}
+                    "MAX_CLUSTERS_ACTIVE":"number of active clusters",
+                    "sigma":"sigma"}
     
     varname_to_value = {}
     for var in varname_dict.keys():
         possible_values = set(df[var])
         key_val_pairs = list(zip(itertools.repeat(var),possible_values))
-        labels_per_key = [f"{varname_dict[x[0]]} = {int(x[1])}" for x in key_val_pairs]
+        labels_per_key = [f"{varname_dict[x[0]]} = {x[1]:g}" for x in key_val_pairs]
         varname_to_value = varname_to_value | dict(zip(key_val_pairs,labels_per_key))
 
     boolean_vars = {("minimize_noncognate_binding",0):"optimize expression",
@@ -61,7 +62,8 @@ def get_varname_to_color_dict():
     #return {"free DNA":np.array([174,169,223])/255,"chromatin":np.array([171,255,184])/255}
     #return {"free DNA":np.array([230,0,73])/255,"chromatin":np.array([11,180,255])/255,
     return {"free DNA":np.array([255,85,103])/255,"chromatin":np.array([11,180,255])/255,
-            "with repressors":np.array([115,93,165])/255,"activators only":np.array([211,197,229])/255,
+            "repressors":np.array([115,93,165])/255,"activators only":np.array([211,197,229])/255,
+            "repressor":np.array([230,170,70])/255,"activator":np.array([10,200,100])/255,
             "gray":0.75*np.array([1,1,1])}
 
 color_dict = get_varname_to_color_dict()
@@ -623,7 +625,7 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
                             suppress_leg=False,linewidth=2,normalize=False,
                             transform_columns=static_columns,legloc="lower left",
                             logfit=False,darken_color=False,markerdict={0:"o",1:"P"},
-                            **kwargs):
+                            leg_include_lines=True,**kwargs):
     gb = df.groupby(cols[0:2],group_keys=True)
 
     if not len(cols) == 4:
@@ -701,11 +703,12 @@ def colorscatter_2d_groupby(df,cols,f,title="",filename="",varnames_dict=[],ax=[
         colorlabs = [get_label([cols[0]],to_tuple(ii),varnames_dict) for ii in set(df[cols[0]])]
 
         handles = [f(markerdict[ii],"k") for ii in set(df[cols[1]])]
-        handles += [mpl.lines.Line2D([0],[0],color=get_color_from_label(x,mastercolor),lw=linewidth)
-                    for x in colorlabs]
+        if leg_include_lines:
+            handles += [mpl.lines.Line2D([0],[0],color=get_color_from_label(x,mastercolor),lw=linewidth)
+                        for x in colorlabs]
 
         ax.legend(handles,markerlabs + colorlabs,loc=legloc,frameon=False,
-                  markerscale=3.5,handlelength=1)
+                  markerscale=3.5,handlelength=1,fontsize=round(LEG_FONT_RATIO*fontsize))
 
     if not ax:
         fig, ax = plt.subplots(figsize=(12*len(gb),24))
@@ -1268,7 +1271,8 @@ def scatter_error_fraction_groupby(df,cols,title="",filename="",varnames_dict=[]
             print(e)
             pass
     else:
-        lg = ax.legend(loc="upper right",markerscale=2)
+        lg = ax.legend(loc="upper right",markerscale=3.5,frameon=False,
+                       fontsize=round(LEG_FONT_RATIO*fontsize))
         for lgh in lg.get_lines():
             lgh.set_alpha(1)
 
@@ -1780,8 +1784,8 @@ def scatter_repressor_activator(df,cols,title="",filename="",ax=(),fontsize=24,v
         labtext = get_label(cols,to_tuple(gr.name),varnames_dict)
 
         #ax.scatter(target_pattern_vals,activator_vals/(activator_vals+repressor_vals),s=10,label=labtext)
-        ax.scatter(target_pattern_vals,activator_vals,s=20,color=np.array([230,170,70])/255,label="activator")
-        ax.scatter(target_pattern_vals,repressor_vals,s=20,color=np.array([10,200,100])/255,label="repressor")
+        ax.scatter(target_pattern_vals,activator_vals,s=20,color=color_dict["activator"],label="activator")
+        ax.scatter(target_pattern_vals,repressor_vals,s=20,color=color_dict["repressor"],label="repressor")
         plt.rcParams.update({'font.size':fontsize})
         plt.rc("legend",fontsize=fontsize)
 

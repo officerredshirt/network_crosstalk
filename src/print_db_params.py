@@ -29,10 +29,10 @@ def main(argv):
 
     #plot_db.convert_to_dataframe(database)
 
+    """
     print("PARAMETERS")
     manage_db.print_res(database,"parameters")
     print("")
-    """
 
     print("NETWORKS")
     manage_db.print_res(database,"networks")
@@ -41,11 +41,11 @@ def main(argv):
     print("PATTERNS")
     manage_db.print_res(database,"patterns")
     print("")
+    """
     
     print("XTALK")
     manage_db.print_res(database,"xtalk")
     print("")
-    """
 
 
 if __name__ == "__main__":
