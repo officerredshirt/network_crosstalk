@@ -781,15 +781,21 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
     T_bool = (T != 0)
 
     def crosstalk_metric(x,c_PF,c_TF,return_var="metric",concentration_penalty=False,cp=[],
-                         ignore_off_for_opt=False,off_ixs=[]):
+                         ignore_off_for_opt=False,off_ixs=[],ignore_nontarget=False):
         if not layer2_repressors:
             def get_pr_open(c_PF,c_TF):
                 C_PF = sum(c_PF)
                 C_TF = sum(c_TF)
                 if crosslayer_crosstalk:
-                    pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])
+                    if ignore_nontarget:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r])
+                    else:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])
                 else:
-                    pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])
+                    if ignore_nontarget:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r])
+                    else:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])
 
                 return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
 
@@ -798,15 +804,25 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
                 C_TF = sum(c_TF)
                 
                 if crosslayer_crosstalk:
-                    pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])*pr_tf_bound(C_TF+C_PF,c_TF[t])
+                    if ignore_nontarget:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r])*pr_tf_bound(c_TF[t],c_TF[t])
+                    else:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_TF,c_PF[r])*pr_tf_bound(C_TF+C_PF,c_TF[t])
                 else:
-                    pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_tf_bound(C_TF,c_TF[t])
+                    if ignore_nontarget:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r])*pr_tf_bound(c_TF[t],c_TF[t])
+                    else:
+                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])*pr_tf_bound(C_TF,c_TF[t])
             
                 return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
 
             def get_error_frac(c_PF,c_TF):
                 C_PF = sum(c_PF)
                 C_TF = sum(c_TF)
+
+                if ignore_nontarget:
+                    print("error: attempting to calculate error fraction when no nontarget binding")
+                    sys.exit()
 
                 if crosslayer_crosstalk:
                     E1 = lambda r: pr_chromatin_error(C_PF+C_TF,c_PF[r])
@@ -832,15 +848,24 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
 
                 if crosslayer_crosstalk:
                     if tf_first_layer:
-                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_A,c_PF[r],C_R)
+                        if ignore_nontarget:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r],0)
+                        else:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_A,c_PF[r],C_R)
                     else:
                         print("currently do not support layer2_repressors with chromatin and crosslayer xtalk")
                         sys.exit()
                 else:
                     if not tf_first_layer:
-                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])
+                        if ignore_nontarget:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r])
+                        else:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r])
                     else:
-                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r],0)
+                        if ignore_nontarget:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r],0)
+                        else:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r],0)
 
                 return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
 
@@ -855,18 +880,30 @@ def get_crosstalk_metric(R,T,G,N_PF,N_TF, \
 
                 if crosslayer_crosstalk:
                     if tf_first_layer:
-                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_A,c_PF[r],C_R) * \
-                                pr_tf_bound(C_A+C_PF,c_A[t],C_R,c_R[t])
+                        if ignore_nontarget:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r],0) * \
+                                    pr_tf_bound(c_A[t],c_A[t],c_R[t],c_R[t])
+                        else:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF+C_A,c_PF[r],C_R) * \
+                                    pr_tf_bound(C_A+C_PF,c_A[t],C_R,c_R[t])
                     else:
                         print("currently do not support layer2_repressors with chromatin and crosslayer xtalk")
                         sys.exit()
                 else:
                     if not tf_first_layer:
-                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r]) * \
-                                pr_tf_bound(C_A,c_A[t],C_R,c_R[t])
+                        if ignore_nontarget:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r]) * \
+                                    pr_tf_bound(c_A[t],c_A[t],c_R[t],c_R[t])
+                        else:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r]) * \
+                                    pr_tf_bound(C_A,c_A[t],C_R,c_R[t])
                     else:
-                        pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r],0) * \
-                                pr_tf_bound(C_A,c_A[t],C_R,c_R[t])
+                        if ignore_nontarget:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(c_PF[r],c_PF[r],0) * \
+                                    pr_tf_bound(c_A[t],c_A[t],c_R[t],c_R[t])
+                        else:
+                            pr_wrapper = lambda r,t: pr_chromatin_open(C_PF,c_PF[r],0) * \
+                                    pr_tf_bound(C_A,c_A[t],C_R,c_R[t])
 
                 return np.concatenate(list(map(pr_wrapper,R_bool,T_bool)))/max_expression
 

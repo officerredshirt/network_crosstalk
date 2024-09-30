@@ -105,6 +105,7 @@ def main(argv):
             # starting point
             c_0 = array([10]*(N_PF_to_use + N_TF_to_use))
             #c_0[cur_input] = 10 
+            c_0[N_PF_to_use:] = 100*target_pattern[N_PF_to_use:N_PF_to_use+N_TF_to_use]
 
             #try:
             optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,

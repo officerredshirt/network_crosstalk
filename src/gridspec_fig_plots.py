@@ -17,17 +17,24 @@ from matplotlib.lines import Line2D
 
 matplotlib.use("agg")
 
-HIGHLY_EXPRESSING_THRESHOLD = 0.8
 RATIO_FOR_SINGLE_EXAMPLES = 1000
+MAXCLUST = 8
+M_GENE = 250
+
+PRINT_MISSING_SIMS = True
+
 GEN_FIGURE_2 = False
 GEN_FIGURE_3 = False
 GEN_FIGURE_4 = False
 GEN_FIGURE_5 = False
-GEN_FIGURE_5_FORMER = False
 GEN_SUPPLEMENTAL = False
 GEN_NOISE = False
 GEN_DIST_TEST = False
-GEN_TEST = True
+GEN_TEST = False
+GEN_SENSITIVITY = False
+GEN_CLUSTERS = False
+GEN_NO_NONTARGET = False
+GEN_EXTENDED_KBT = False
 
 pandas.options.mode.chained_assignment = None
 
@@ -67,29 +74,43 @@ def main(argv):
 
     #plot_db.tf_vs_kpr_error_rate(df,"../plots/fig/")
 
-    maxclust = 8
-    m_gene = 250
-
     df["N_PF"] = df["N_PF"].astype(pandas.Int64Dtype())
     df["N_TF"] = df["N_TF"].astype(pandas.Int64Dtype())
-    df = df.loc[(df["layer1_static"] == False) & (df["ratio_KNS_KS"] > 100) &
+    df = df.loc[(df["layer1_static"] == False) & #(df["ratio_KNS_KS"] > 100) &
                (df["MIN_EXPRESSION"] < 0.3)]
     varnames_dict = plot_db.get_varname_to_value_dict(df)
 
     df_fluctuation = df.loc[(df["target_distribution"] == "uni") & 
                             (df["MIN_EXPRESSION"] < 0.01) &
                             (df["minimize_noncognate_binding"] == 0) &
-                            (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                            (df["M_GENE"] == m_gene) &
+                            (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                            (df["M_GENE"] == M_GENE) &
                             (df["target_independent_of_clusters"] == False) &
-                            (df["ignore_off_during_optimization"] == False)]
+                            (df["ignore_off_during_optimization"] == False) &
+                            (df["ratio_KNS_KS"] > 100)]
 
     df = df.loc[(df["sigma"] == 0)]
     df_normal = df.loc[(df["ignore_off_during_optimization"] == False) &
                 (df["target_independent_of_clusters"] == False) &
                 (df["layer2_repressors"] == False) &
                 (df["MIN_EXPRESSION"] > 0.01) &
-                (df["target_distribution"] == "uni")]
+                (df["target_distribution"] == "uni") &
+                (df["k_neq"] == 0.05) &
+                (df["rm"] == 0.0002) &
+                (df["GENES_PER_CLUSTER"] == 10) &
+                (df["MAX_CLUSTERS_ACTIVE"] != 16) &
+                (df["ratio_KNS_KS"] > 100)]
+    df_extended = df.loc[(df["M_GENE"] == 500) &
+                         (df["MAX_CLUSTERS_ACTIVE"] == 16)]
+
+    df_sensitivity = df.loc[(df["target_distribution"] == "uni") & 
+                     (df["MIN_EXPRESSION"] > 0.01) &
+                     (df["layer2_repressors"] == False) &
+                     (df["minimize_noncognate_binding"] == 0) &
+                     (df["M_GENE"] == M_GENE) &
+                     (df["target_independent_of_clusters"] == False) &
+                     (df["ignore_off_during_optimization"] == False) &
+                     (df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)]
 
     df_filter_0p1 = pandas.read_parquet(f"../fluctuation_res_sigma0.1.pq")
     df_filter_0p05 = pandas.read_parquet(f"../fluctuation_res_sigma0.05.pq")
@@ -101,7 +122,15 @@ def main(argv):
     insetsz = 0.4
     biginsetsz = 0.5
     plt.rcParams["font.size"] = f"{fntsz}"
-    pale_yellow = np.array([254,252,158])/255
+    highlight_color = 0.85*np.array([1,1,1])#np.array([254,252,158])/255
+
+
+    if PRINT_MISSING_SIMS:
+        def print_missing_sims(gr):
+            nentries = len(gr)
+            if (nentries != 20) & (nentries != 200) & (nentries != 400):
+                print(f"{gr.name}: {nentries}")
+        df.groupby("filename").apply(print_missing_sims)
 
 
     # ----- FIGURE 2 ----- #
@@ -124,8 +153,8 @@ def main(argv):
                "J":plt.subplot(inner1[3])}
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["M_GENE"] == m_gene) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
+                                        (df_normal["M_GENE"] == M_GENE) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST)],
                                  ["tf_first_layer"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
@@ -150,8 +179,8 @@ def main(argv):
         plt.setp(axd["B"].get_yticklabels(),visible=False)
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_normal["M_GENE"] == m_gene)],
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df_normal["M_GENE"] == M_GENE)],
                                  ["M_GENE"],
                                  [],[],
                                  plot_db.rms_barchart_groupby,
@@ -164,8 +193,8 @@ def main(argv):
 
         ax_inset = axd["C"].inset_axes((0.53,0.58,insetsz,insetsz))
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_normal["M_GENE"] == m_gene)],
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df_normal["M_GENE"] == M_GENE)],
                                  "M_GENE",
                                  [],[],
                                  plot_db.symbolscatter_groupby,
@@ -177,10 +206,11 @@ def main(argv):
                                  markers=["h"],
                                  varnames_dict=varnames_dict)
         ax_inset.set_box_aspect(1)
+        ax_inset.set_yticks([1,10,100])
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_normal["M_GENE"] == m_gene)],
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df_normal["M_GENE"] == M_GENE)],
                                  "M_GENE",
                                  [],[],
                                  plot_db.symbolscatter_groupby,
@@ -195,8 +225,8 @@ def main(argv):
 
         plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                                         (df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["layer2_repressors"] == 0) &
                                         (df["MIN_EXPRESSION"] > 0.01) &
@@ -211,8 +241,8 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) & 
                                         (df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["layer2_repressors"] == 0) &
                                         (df["MIN_EXPRESSION"] > 0.01) &
@@ -230,8 +260,8 @@ def main(argv):
                       #transform=axd["G"].transAxes,va="center",ha="center")
         axd["G"].set_yticks([0,0.1])
 
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["M_GENE"] == m_gene) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["M_GENE"] == M_GENE) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                                         (df_normal["minimize_noncognate_binding"] == 0) &
                                         (df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)],
                                  ["tf_first_layer"],
@@ -277,7 +307,7 @@ def main(argv):
             vals[cols[3]] = N_ON # x-axis
             vals[cols[2]] = N_ON.div(M) # marker sizing
             return vals
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                                                (df_normal["minimize_noncognate_binding"] == 0)],
                                  ["ratio_KNS_KS"],
                                  [],[],
@@ -293,7 +323,7 @@ def main(argv):
         axd["J"].set_xscale("log")
         axd["J"].set_yscale("log")
         ylims = axd["J"].get_ylim()
-        axd["J"].plot([maxclust*10,maxclust*10],ylims,linewidth=2,color="gray",linestyle="dashed",
+        axd["J"].plot([MAXCLUST*10,MAXCLUST*10],ylims,linewidth=2,color="gray",linestyle="dashed",
                       zorder=0)
         axd["J"].set_ylim(ylims)
         axd["J"].set_xlabel("number of ON genes")
@@ -322,20 +352,20 @@ def main(argv):
         box.set_figure(box.figure)
         
 
-        # yellow highlight
+        # highlight
         rectwidth = 1
         rectx = 2.125-rectwidth/2
         rect = patches.Rectangle((rectx,0),rectwidth,0.038, \
-                linewidth=3,edgecolor="none",facecolor=pale_yellow,zorder=0)
+                linewidth=3,edgecolor="none",facecolor=highlight_color,zorder=0)
         axd["C"].add_patch(rect)
 
-        axd["G"].set_facecolor("none")
-        axd["H"].set_facecolor("none")
-        axd["I"].set_facecolor("none")
-        axd["J"].set_facecolor("none")
+        #axd["G"].set_facecolor("none")
+        #axd["H"].set_facecolor("none")
+        #axd["I"].set_facecolor("none")
+        #axd["J"].set_facecolor("none")
 
         plt.gcf().text(0.014,0.930,"A",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.652,0.950,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.64,0.950,"B",fontsize=fntsz,fontweight="bold")
         plt.gcf().text(0.014,0.390,"C",fontsize=fntsz,fontweight="bold")
         plt.gcf().text(0.268,0.390,"D",fontsize=fntsz,fontweight="bold")
         plt.gcf().text(0.51,0.390,"E",fontsize=fntsz,fontweight="bold")
@@ -353,18 +383,18 @@ def main(argv):
                     color="none")
             axd["C"].add_artist(p)
             l[3*(ii-1):(3*(ii-1)+3),:] = p.get_path().vertices
-        fig.patches.extend([plt.Polygon(l,ec="none",fc=pale_yellow,zorder=-100, \
+        fig.patches.extend([plt.Polygon(l,ec="none",fc=highlight_color,zorder=-100, \
                 transform=axd["C"].transData,clip_on=False)])
 
         """
         p1 = matplotlib.patches.ConnectionPatch((rectx,0),(0,1), \
                 coordsA="data",coordsB="axes fraction", \
                 axesA=axd["C"],axesB=axd["G"], \
-                color="k",linewidth=3,facecolor=pale_yellow)
+                color="k",linewidth=3,facecolor=highlight_color)
         p2 = matplotlib.patches.ConnectionPatch((rectx+rectwidth,0),(1,1), \
                 coordsA="data",coordsB="axes fraction", \
                 axesA=axd["C"],axesB=axd["J"], \
-                color="k",linewidth=3,facecolor=pale_yellow)
+                color="k",linewidth=3,facecolor=highlight_color)
         axd["C"].add_artist(p1)
         axd["C"].add_artist(p2)
         """
@@ -378,6 +408,7 @@ def main(argv):
     if GEN_FIGURE_3:
         fig = plt.figure(figsize=(20,12),layout="tight")
 
+        """
         outer = gs.GridSpec(1,2,width_ratios=[1.1,1])
         left = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=outer[0],height_ratios=[1.2,1],hspace=0.01)
         right = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=outer[1],height_ratios=[0.6,1],hspace=0.3)
@@ -388,14 +419,25 @@ def main(argv):
                "C":plt.subplot(scatter_actual[1]),  # scatter target expression
                "D":plt.subplot(right[1]),      # fancy scatter
                "E":plt.subplot(left[0])}
+        """
+        outer = gs.GridSpec(2,1,height_ratios=[0.7,1])
+        bottom = gs.GridSpecFromSubplotSpec(1,2,subplot_spec=outer[1],width_ratios=[1.6,1],wspace=0.08)
+        bottom_left = gs.GridSpecFromSubplotSpec(1,2,subplot_spec=bottom[0],width_ratios=[1,1],wspace=0.1)
+        scatter_actual = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=bottom_left[1])
 
-        nontarget_contribution_schematic = mpimg.imread("../plots/fig/nontarget_contribution_schematic_mod.png")
+        axd = {"A":plt.subplot(bottom_left[0]),   # nontarget contribution scatterplot
+               "B":plt.subplot(scatter_actual[0]),  # scatter target expression
+               "C":plt.subplot(scatter_actual[1]),  # scatter target expression
+               "D":plt.subplot(bottom[1]),      # fancy scatter
+               "E":plt.subplot(outer[0])}  # schematic
+
+        nontarget_contribution_schematic = mpimg.imread("../plots/fig/nontarget_contribution_schematic.png")
         axd["E"].imshow(nontarget_contribution_schematic)
         axd["E"].axis("off")
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
-                                        (df_normal["M_GENE"] == m_gene) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust)],
+                                        (df_normal["M_GENE"] == M_GENE) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST)],
                                  ["tf_first_layer"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
@@ -407,20 +449,20 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         box1 = axd["B"].get_position()
         box2 = axd["C"].get_position()
-        axd["B"].xaxis.set_label_coords(1.15,-0.15)
-        axd["B"].set_ylabel("actual\nexpression")
+        axd["B"].set_ylabel("actual expression")
+        axd["B"].yaxis.set_label_coords(-0.15,-0.06)
         axd["C"].set_ylabel("")
-        axd["C"].set_xlabel("")
+        axd["B"].set_xlabel("")
         axd["B"].set_xticks([0,1])
         axd["B"].set_yticks([0,1])
         axd["C"].set_xticks([0,1])
         axd["C"].set_yticks([0,1])
-        plt.setp(axd["C"].get_yticklabels(),visible=False)
+        plt.setp(axd["B"].get_xticklabels(),visible=False)
 
-        axd["C"].text(0.6,0.21,"optimize\nexpression",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
-        axd["C"].text(0.3,0.72,"optimize\nbinding",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
-        axd["B"].text(0.6,0.21,"optimize\nexpression",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
-        axd["B"].text(0.3,0.72,"optimize\nbinding",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+        axd["C"].text(0.6,0.16,"optimize\nexpression",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+        axd["C"].text(0.35,0.80,"optimize\nbinding",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+        axd["B"].text(0.6,0.16,"optimize\nexpression",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+        axd["B"].text(0.35,0.80,"optimize\nbinding",va="center",ha="center",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
 
         """
         legend_elements = [Line2D([0],[0],marker='P',color='w',
@@ -436,8 +478,8 @@ def main(argv):
         """
 
         plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
-                                        (df_normal["M_GENE"] == m_gene) &
-                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+                                        (df_normal["M_GENE"] == M_GENE) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                                         (df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)],
                                  ["M_GENE"],
                                  [],[],
@@ -450,8 +492,8 @@ def main(argv):
         #axd["A"].plot(0.5,0.2,'X',color='k')
         #axd["A"].plot(0.5,0.14,'X',color='k')
 
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                               (df_normal["M_GENE"] == m_gene)],
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                               (df_normal["M_GENE"] == M_GENE)],
                                  ["M_GENE"],
                                  [],[],
                                  plot_db.colorscatter_2d_groupby,
@@ -470,9 +512,9 @@ def main(argv):
         #axd["D"].set_box_aspect(1)
 
         plt.gcf().text(0.01,0.94,"A",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.034,0.488,"B",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.53,0.94,"C",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.53,0.56,"D",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.01,0.60,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.36,0.59,"C",fontsize=fntsz,fontweight="bold")
+        #plt.gcf().text(0.561,0.59,"D",fontsize=fntsz,fontweight="bold")
 
         plt.savefig("../plots/fig/fig3.png")
         plt.close()
@@ -480,6 +522,9 @@ def main(argv):
 
     # ----- FIGURE 4 ----- #
     if GEN_FIGURE_4:
+        fig = plt.figure(figsize=(30,20),layout="tight")
+
+        """
         fig = plt.figure(figsize=(30,16),layout="tight")
 
         outer = gs.GridSpec(2,1,height_ratios=[5,1])
@@ -488,14 +533,6 @@ def main(argv):
         metrics = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=left[1],wspace=0.55)
         extended_scatter = gs.GridSpecFromSubplotSpec(2,2,subplot_spec=top[1],height_ratios=[1.5,1],
                                                     wspace=0.07,hspace=0.15)
-        """
-        on_distributions = gs.GridSpecFromSubplotSpec(1,4,subplot_spec=outer[1],width_ratios=[3.2,1,3.2,1],
-                                                      wspace=0.15)
-        A_histograms = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=on_distributions[0],
-                                                   wspace=0.05)
-        AR_histograms = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=on_distributions[2],
-                                                   wspace=0.05)
-        """
         histograms = gs.GridSpecFromSubplotSpec(1,8,subplot_spec=outer[1],wspace=0.5, \
                 width_ratios=[1,1,1,0.001,1,1,1,0.001])
 
@@ -503,11 +540,11 @@ def main(argv):
         axd = {"schematic":plt.subplot(left[0]),
                "A":plt.subplot(extended_scatter[0]),
                "B":plt.subplot(extended_scatter[1]),
-               "C":plt.subplot(metrics[0]),
+               "F":plt.subplot(metrics[0]),
                "Ca":plt.subplot(metrics[1]),
                "D":plt.subplot(extended_scatter[2]),
                "E":plt.subplot(extended_scatter[3]),
-               "F":plt.subplot(metrics[2]),
+               "C":plt.subplot(metrics[2]),
                "G":plt.subplot(histograms[0]),
                "H":plt.subplot(histograms[1]),
                "I":plt.subplot(histograms[2]),
@@ -515,22 +552,36 @@ def main(argv):
                "L":plt.subplot(histograms[5]),
                "M":plt.subplot(histograms[6])}
         """
-               "G":plt.subplot(A_histograms[0]),
-               "H":plt.subplot(A_histograms[1]),
-               "I":plt.subplot(A_histograms[2]),
-               "J":plt.subplot(on_distributions[1]),
-               "K":plt.subplot(AR_histograms[0]),
-               "L":plt.subplot(AR_histograms[1]),
-               "M":plt.subplot(AR_histograms[2]),
-               "N":plt.subplot(on_distributions[3])}
-        """
+        outer = gs.GridSpec(2,1,height_ratios=[1,1])
+        bottom = gs.GridSpecFromSubplotSpec(1,2,width_ratios=[1,2],subplot_spec=outer[1])
+        extended_scatter = gs.GridSpecFromSubplotSpec(2,2,subplot_spec=bottom[0],height_ratios=[2,1],
+                                                         wspace=0.07,hspace=0.15)
+        right = gs.GridSpecFromSubplotSpec(2,1,height_ratios=[1.4,1],subplot_spec=bottom[1],hspace=0.35)
+        metrics = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=right[0],wspace=0.55)
+        histograms = gs.GridSpecFromSubplotSpec(2,4,subplot_spec=right[1], \
+                width_ratios=[1,1,1,0.001],wspace=0.5,hspace=0.1)
 
-        repressor_schematic = mpimg.imread("../plots/fig/repressor_schematic2.png")
+        axd = {"schematic":plt.subplot(outer[0]),
+               "A":plt.subplot(extended_scatter[0]),
+               "B":plt.subplot(extended_scatter[1]),
+               "F":plt.subplot(metrics[0]),
+               "Ca":plt.subplot(metrics[1]),
+               "D":plt.subplot(extended_scatter[2]),
+               "E":plt.subplot(extended_scatter[3]),
+               "C":plt.subplot(metrics[2]),
+               "G":plt.subplot(histograms[0]),
+               "H":plt.subplot(histograms[1]),
+               "I":plt.subplot(histograms[2]),
+               "K":plt.subplot(histograms[4]),
+               "L":plt.subplot(histograms[5]),
+               "M":plt.subplot(histograms[6])}
+
+        repressor_schematic = mpimg.imread("../plots/fig/repressor_schematic.png")
         axd["schematic"].imshow(repressor_schematic)
         axd["schematic"].axis("off")
 
-        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == M_GENE) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["ignore_off_during_optimization"] == 0) &
@@ -574,8 +625,8 @@ def main(argv):
         """
         ax_inset_a = axd["A"].inset_axes((0.57,0.07,insetsz,insetsz))
         ax_inset_b = axd["B"].inset_axes((0.57,0.07,insetsz,insetsz))
-        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == M_GENE) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["ignore_off_during_optimization"] == 0) &
@@ -603,8 +654,8 @@ def main(argv):
         adjust_inset(ax_inset_b)
         """
 
-        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == m_gene) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        plot_db.subplots_groupby(df.loc[(df["M_GENE"] == M_GENE) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                                         (df["minimize_noncognate_binding"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["ignore_off_during_optimization"] == 0) &
@@ -648,6 +699,9 @@ def main(argv):
                                     fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),
                                     frameon=False)
 
+        axd["E"].set_xlabel("")
+        axd["D"].xaxis.set_label_coords(1.02,-0.2)
+
         #axd["E"].annotate("baseline\nexpression",xy=(xover_coord_free_DNA,0),xytext=(xover_coord,100),
                           #arrowprops=dict(arrowstyle="-",linewidth=2,edgecolor="k"),ha="center",
                           #fontsize=round(0.75*fntsz))
@@ -655,8 +709,8 @@ def main(argv):
         """
         plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                                         (df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["MIN_EXPRESSION"] < 0.01) &
@@ -671,8 +725,8 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df.loc[(df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) & 
                                         (df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["MIN_EXPRESSION"] < 0.01) &
@@ -689,8 +743,8 @@ def main(argv):
         axd["C"].set_yticks([0,0.03,0.06])
         """
         plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["MIN_EXPRESSION"] < 0.01) &
@@ -705,11 +759,11 @@ def main(argv):
                                  subtitles=[""],fontsize=fntsz,
                                  take_ratio=True,ylabel="GEE fold-reduction",logyax=True,
                                  linestyle="dashed",
-                                 markers=["o"],
+                                 markers=["h"],
                                  varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["MIN_EXPRESSION"] < 0.01) &
@@ -730,8 +784,8 @@ def main(argv):
         axd["C"].text(2000,3.1,"A",va="top",ha="right",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
 
         plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["MIN_EXPRESSION"] < 0.01) &
@@ -749,8 +803,8 @@ def main(argv):
                                  markers=["o"],reverse_ratio=True,
                                  varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["MIN_EXPRESSION"] < 0.01) &
@@ -769,7 +823,7 @@ def main(argv):
                                  varnames_dict=varnames_dict)
         axd["C"].set_ylim([pow(10,0),pow(10,1.5)])
         axd["Ca"].set_ylim([pow(10,-0.25),10])
-        axd["Ca"].plot([1e2,1e4],[1,1],linewidth=1,color="black",linestyle="solid",zorder=0)
+        axd["Ca"].plot([1e2,1e4],[1,1],linewidth=1,color="black",linestyle="dashed",zorder=0)
         #labels=["f.D./c. (a.o.)","f.D./c. (w.r.)","a.o./w.r. (c.)","a.o/w.r. (f.D.)"]
         #axd["C"].legend(labels=labels,handlelength=1,ncol=2,columnspacing=0.8,
                         #fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),
@@ -777,8 +831,8 @@ def main(argv):
 
 
         plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["layer2_repressors"] == 0) &
@@ -795,8 +849,8 @@ def main(argv):
                                  linestyle="dashed",
                                  varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
-                                        (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df["M_GENE"] == m_gene) &
+                                        (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df["M_GENE"] == M_GENE) &
                                         (df["ignore_off_during_optimization"] == 0) &
                                         (df["target_independent_of_clusters"] == 0) &
                                         (df["layer2_repressors"] == 1) &
@@ -815,8 +869,17 @@ def main(argv):
         axd["F"].set_yticks([1,10,100])
         axd["F"].yaxis.set_minor_formatter(ticker.NullFormatter())
 
-        axd["F"].text(550,24,"A+R",va="top",ha="right",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+        #axd["F"].text(550,24,"A+R",va="top",ha="right",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
         axd["F"].text(2000,6.5,"A",va="top",ha="right",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+        axd["F"].annotate("A+R",xy=(330,6.8),xytext=(330,24),ha="center",va="top",
+                          fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),
+                          arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
+        axd["F"].annotate(" ",xy=(800,9),xytext=(330,24),ha="center",va="top",
+                          arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
+        axd["F"].annotate(" ",xy=(1300,7),xytext=(1680,6.1),ha="center",va="top",
+                          arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
+        axd["F"].annotate(" ",xy=(1700,14),xytext=(1700,6.5),ha="center",va="top",
+                          arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
         """
         legend_elements = [Line2D([0],[0],color=plot_db.color_dict["activators only"],linestyle="dashed",
                                   label="A",linewidth=3),
@@ -833,16 +896,16 @@ def main(argv):
                                     bbox_to_anchor=(-0.15,1.02,1,0.1),loc=3)
         """
 
-        df_A_dist = df.loc[(df["M_GENE"] == m_gene) &
-                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        df_A_dist = df.loc[(df["M_GENE"] == M_GENE) &
+                         (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                          (df["minimize_noncognate_binding"] == 0) &
                          (df["target_independent_of_clusters"] == 0) &
                          (df["ignore_off_during_optimization"] == 0) &
                          (df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
                          (df["layer2_repressors"] == 0) &
                          (df["MIN_EXPRESSION"] < 0.01)]
-        df_AR_dist = df.loc[(df["M_GENE"] == m_gene) &
-                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        df_AR_dist = df.loc[(df["M_GENE"] == M_GENE) &
+                         (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                          (df["minimize_noncognate_binding"] == 0) &
                          (df["target_independent_of_clusters"] == 0) &
                          (df["ignore_off_during_optimization"] == 0) &
@@ -905,14 +968,20 @@ def main(argv):
         axd["M"].get_legend().remove()
 
         axd["G"].set_xlabel("")
-        axd["H"].set_xlabel("expression")
+        #axd["H"].set_xlabel("expression")
+        axd["H"].set_xlabel("")
         axd["I"].set_xlabel("")
         axd["K"].set_xlabel("")
         axd["L"].set_xlabel("expression")
         axd["M"].set_xlabel("")
 
+        axd["G"].set_xticks([])
+        axd["H"].set_xticks([])
+        axd["I"].set_xticks([])
+
         def label_axis(ax,text):
-            ax.text(0.1,0.9,text,va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),transform=ax.transAxes)
+            ax.text(0.1,0.9,text,va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz),
+                    transform=ax.transAxes,fontweight="bold")
         label_axis(axd["G"],"A")
         label_axis(axd["H"],"A")
         label_axis(axd["I"],"A")
@@ -920,7 +989,9 @@ def main(argv):
         label_axis(axd["L"],"A+R")
         label_axis(axd["M"],"A+R")
 
-        axd["G"].annotate("target",xy=(0.895,0.04),xytext=(0.7,0.4),xycoords="axes fraction",ha="center",
+        #axd["G"].annotate("target",xy=(0.895,0.04),xytext=(0.7,0.4),xycoords="axes fraction",ha="center",
+        #                  arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
+        axd["G"].annotate("target",xy=(0.65,0.05),xytext=(0.7,0.4),xycoords="axes fraction",ha="center",
                           arrowprops=dict(arrowstyle="-",linewidth=1.5,mutation_scale=40,edgecolor="k"))
 
         """
@@ -949,11 +1020,18 @@ def main(argv):
         axd["N"].set_yticks([0,0.04,0.08])
         """
 
+        """
         plt.gcf().text(0.055,0.949,"A",fontsize=fntsz,fontweight="bold")
         plt.gcf().text(0.630,0.956,"B",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.055,0.590,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.030,0.590,"C",fontsize=fntsz,fontweight="bold")
         plt.gcf().text(0.630,0.558,"D",fontsize=fntsz,fontweight="bold")
         plt.gcf().text(0.055,0.212,"E",fontsize=fntsz,fontweight="bold")
+        """
+        plt.gcf().text(0.012,0.949,"A",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.012,0.507,"B",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.373,0.507,"C",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.012,0.206,"D",fontsize=fntsz,fontweight="bold")
+        plt.gcf().text(0.400,0.220,"E",fontsize=fntsz,fontweight="bold")
 
         plt.savefig("../plots/fig/fig4.png")
         plt.close()
@@ -961,131 +1039,158 @@ def main(argv):
 
     # ----- FIGURE 5 ----- #
     if GEN_FIGURE_5:
-        def fluctuation_plot_fn(x):
-            fluctuation_all = plot_db.get_mean_fluctuation_rmse(x)
-            return np.divide(fluctuation_all,x["actual_patterning_error"])
+        for layer2_repressors in [0,1]:
+            def fluctuation_plot_fn(x):
+                fluctuation_all = plot_db.get_mean_fluctuation_rmse(x)
+                return np.divide(fluctuation_all,x["actual_patterning_error"])
 
-        fig = plt.figure(figsize=(30,18),layout="tight")
+            fig = plt.figure(figsize=(20,9),layout="tight")
 
-        outer = gs.GridSpec(2,1,height_ratios=[1.4,1])
-        top = gs.GridSpecFromSubplotSpec(1,3,subplot_spec=outer[0],width_ratios=[1,0.8,0.8])
-        #middle = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=top[1],height_ratios=[1,0.8],hspace=0.05)
-        bottom = gs.GridSpecFromSubplotSpec(1,4,subplot_spec=outer[1],wspace=0.3)
+            outer = gs.GridSpec(1,2)
+            left = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=outer[0],hspace=0.1)
+            middle = gs.GridSpecFromSubplotSpec(2,1,subplot_spec=outer[1],hspace=0.1)
 
-        S_xticks = [1e2,1e3,1e4]
-        repressor_markerdict = {0:"o",1:"v"}
+            S_xticks = [1e2,1e3,1e4]
+            repressor_markerdict = {0:"o",1:"v"}
 
-        axd = {"B":plt.subplot(top[0]),
-               "A":plt.subplot(top[1]),
-               #"B":plt.subplot(middle[0]),
-               #"C":plt.subplot(middle[1]),
-               "D":plt.subplot(top[2]),
-               "E":plt.subplot(bottom[0]),
-               "F":plt.subplot(bottom[1]),
-               "G":plt.subplot(bottom[2]),
-               "H":plt.subplot(bottom[3])}
+            axd = {"A":plt.subplot(left[0]),
+                   "B":plt.subplot(left[1]),
+                   "C":plt.subplot(middle[0]),
+                   "D":plt.subplot(middle[1])}
 
-        fluc_colors = [0.8*np.ones((1,3)),0.5*np.ones((1,3)),np.zeros((1,3))]
-        def plot_fold_reduction_fluctuation(df,ax,color):
-            plot_db.subplots_groupby(df.loc[(df["layer2_repressors"] == 0) &
-                                            (df["target_distribution"] == "uni")],
-                                     "M_GENE",
+
+            plot_db.subplots_groupby(df_filter_0p1.loc[df_filter_0p1["layer2_repressors"] == layer2_repressors],
+                                     ["M_GENE"],
                                      [],[],
                                      plot_db.symbolscatter_groupby,
                                      ["ratio_KNS_KS","tf_first_layer"],
                                      plot_db.get_mean_fluctuation_rmse,
-                                     ax=ax,suppress_leg=True,color=color,
+                                     ax=[axd["A"]],
                                      subtitles=[""],fontsize=fntsz,
-                                     take_ratio=True,ylabel="fold-reduction",logyax=True,
+                                     markeralpha=1,markerdict=repressor_markerdict,
+                                     ylabel="GEE",legloc="lower left",
                                      varnames_dict=varnames_dict)
-            plot_db.subplots_groupby(df.loc[(df["layer2_repressors"] == 1) &
-                                            (df["target_distribution"] == "uni")],
-                                     "M_GENE",
+            plot_db.subplots_groupby(df_filter_0p1.loc[df_filter_0p1["layer2_repressors"] == layer2_repressors],
+                                     ["M_GENE"],
                                      [],[],
                                      plot_db.symbolscatter_groupby,
                                      ["ratio_KNS_KS","tf_first_layer"],
-                                     plot_db.get_mean_fluctuation_rmse,
-                                     ax=ax,suppress_leg=True,color=color,
-                                     subtitles=[""],fontsize=fntsz,
-                                     take_ratio=True,ylabel="fold-reduction",logyax=True,
-                                     markers=repressor_markerdict[1],
+                                     lambda x: x["actual_patterning_error"],
+                                     ax=[axd["A"]],
+                                     subtitles=[""],fontsize=fntsz,suppress_leg=True,
+                                     markeralpha=1,markerdict=repressor_markerdict,
+                                     ylabel="GEE",
+                                     linestyle="dotted",zorder=0,
                                      varnames_dict=varnames_dict)
-        plot_fold_reduction_fluctuation(df_filter_0p05,[axd["A"]],fluc_colors[0])
-        plot_fold_reduction_fluctuation(df_filter_0p1,[axd["A"]],fluc_colors[1])
-        plot_fold_reduction_fluctuation(df_filter_0p2,[axd["A"]],fluc_colors[2])
-        axd["A"].set_ylabel("fold-reduction in GEE")
-        axd["A"].set_ylim(0.5,15)
-        axd["A"].set_yticks([1,10])
-        axd["A"].set_xticks(S_xticks)
-        # legend
-        handles = [Line2D([0],[0],color=x,linewidth=2) for x in fluc_colors]
-        axd["A"].legend(handles,["$\sigma$ = 0.05","$\sigma$ = 0.1","$\sigma$ = 0.2"],
-                        frameon=False,handlelength=1,loc="lower left")
+            axd["A"].set_yscale("log")
+            axd["A"].set_xticks([])
+            axd["A"].set_xlabel("")
+            if layer2_repressors:
+                axd["A"].text(3000,3e-2,"$\sigma$ = 0.1",va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+                axd["A"].text(3000,1.10e-3,"$\sigma$ = 0",va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
 
-        plot_db.subplots_groupby(df_filter_0p1,
-                                 ["M_GENE"],
-                                 [],[],
-                                 plot_db.colorscatter_2d_groupby,
-                                 ["tf_first_layer","layer2_repressors","MAX_CLUSTERS_ACTIVE","ratio_KNS_KS"],
-                                 lambda x: x["actual_patterning_error"],
-                                 ax=[axd["B"]],fontsize=fntsz,draw_lines=True,
-                                 markeralpha=1,markerdict=repressor_markerdict,
-                                 darken_color=True,
-                                 size_lims=[500,500],suppress_leg=True,
-                                 subtitles=[""],ylabel="GEE",
-                                 varnames_dict=varnames_dict)
-        plot_db.subplots_groupby(df_filter_0p1,
-                                 ["M_GENE"],
-                                 [],[],
-                                 plot_db.colorscatter_2d_groupby,
-                                 ["tf_first_layer","layer2_repressors","MAX_CLUSTERS_ACTIVE","ratio_KNS_KS"],
-                                 plot_db.get_mean_fluctuation_rmse,
-                                 ax=[axd["B"]],fontsize=fntsz,draw_lines=True,
-                                 markeralpha=1,markerdict=repressor_markerdict,
-                                 size_lims=[500,500],#suppress_leg=True,
-                                 subtitles=[""],ylabel="GEE",
-                                 varnames_dict=varnames_dict)
-        axd["B"].set_yscale("log")
-        axd["B"].set_xticks(S_xticks)
-        plt.setp(axd["B"].get_xticklabels(),visible=False)
-        axd["B"].set_xlabel("")
+            axd["A"].text(0.1,0.60,varnames_dict[("layer2_repressors",layer2_repressors)],
+                          va="center",ha="left",fontweight="bold",transform=axd["A"].transAxes,
+                          fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
 
-        plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == 0) &
-                                               (df_filter_0p1["tf_first_layer"] == 0)],
-                                 ["tf_first_layer"],
-                                 [],[],
-                                 plot_db.scatter_fluctuation_groupby,
-                                 ["ratio_KNS_KS"],
-                                 subtitles=[""],gray_cb=True,
-                                 fontsize=fntsz,ax=[axd["D"]],
-                                 varnames_dict=varnames_dict)
-        plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == 0) &
-                                               (df_filter_0p1["tf_first_layer"] == 1)],
-                                 ["tf_first_layer"],
-                                 [],[],
-                                 plot_db.scatter_fluctuation_groupby,
-                                 ["ratio_KNS_KS"],
-                                 subtitles=[""],
-                                 suppress_leg=True,colorbar_leg=False,
-                                 fontsize=fntsz,ax=[axd["D"]],
-                                 varnames_dict=varnames_dict)
-        axd["D"].set_xticks([1e-1,1e-2])
-        ax_inset = axd["D"].inset_axes((0.55,0.08,insetsz,insetsz))
-        plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == 0)],
-                                 ["tf_first_layer"],
-                                 [],[],
-                                 plot_db.scatter_fluctuation_groupby,
-                                 ["ratio_KNS_KS"],normalize=True,
-                                 subtitles=["",""],
-                                 fontsize=insetfntsz,ax=[ax_inset,ax_inset],
-                                 suppress_leg=True,colorbar_leg=False,
-                                 varnames_dict=varnames_dict)
-        ax_inset.set_xticks([0.9,1])
-        ax_inset.set_yticks([0,0.5,1])
-        ax_inset.set_xlabel("")
-        ax_inset.set_ylabel("")
-        ax_inset.set_title("normalized\nGEE")
+            fluc_colors = [np.zeros((1,3)),0.5*np.ones((1,3)),0.8*np.ones((1,3))]
+            linestyle_dict = {0:"dashed",1:"solid"}
+            def plot_fold_reduction_fluctuation(df,ax,color):
+                plot_db.subplots_groupby(df.loc[(df["layer2_repressors"] == layer2_repressors) &
+                                                (df["target_distribution"] == "uni")],
+                                         "M_GENE",
+                                         [],[],
+                                         plot_db.symbolscatter_groupby,
+                                         ["ratio_KNS_KS","tf_first_layer"],
+                                         plot_db.get_mean_fluctuation_rmse,
+                                         ax=ax,suppress_leg=True,color=color,
+                                         subtitles=[""],fontsize=fntsz,
+                                         take_ratio=True,ylabel="fold-reduction",logyax=True,
+                                         markers=repressor_markerdict[layer2_repressors],
+                                         linestyle=linestyle_dict[layer2_repressors],
+                                         varnames_dict=varnames_dict)
+            def plot_fold_reduction_wrapper(ax):
+                plot_fold_reduction_fluctuation(df_filter_0p05,[ax],fluc_colors[0])
+                plot_fold_reduction_fluctuation(df_filter_0p1,[ax],fluc_colors[1])
+                plot_fold_reduction_fluctuation(df_filter_0p2,[ax],fluc_colors[2])
+                ax.set_ylim(0.8,10)
+                ax.set_yticks([1,10])
+                ax.set_xticks(S_xticks)
 
+            plot_fold_reduction_wrapper(axd["B"])
+            plot_db.subplots_groupby(df.loc[(df["minimize_noncognate_binding"] == 0) &
+                                            (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                            (df["M_GENE"] == M_GENE) &
+                                            (df["ignore_off_during_optimization"] == 0) &
+                                            (df["target_independent_of_clusters"] == 0) &
+                                            (df["MIN_EXPRESSION"] < 0.01) &
+                                            (df["layer2_repressors"] == layer2_repressors) &
+                                            (df["target_distribution"] == "uni")],
+                                     ["M_GENE"],
+                                     [],[],
+                                     plot_db.symbolscatter_groupby,
+                                     ["ratio_KNS_KS","tf_first_layer"],
+                                     plot_db.rms_patterning_error,
+                                     ax=[axd["B"]],suppress_leg=True,
+                                     subtitles=[""],fontsize=fntsz,#linewidth=2,markersize=10,
+                                     take_ratio=True,ylabel="GEE fold-reduction\nchromatin / free DNA",logyax=True,
+                                     linestyle="dotted",
+                                     #force_color=True,color=plot_db.color_dict["with repressors"],
+                                     markers=["v"],
+                                     varnames_dict=varnames_dict)
+            axd["B"].plot([1e2,1e4],[1,1],linewidth=1,color="black",linestyle="dashed",zorder=0)
+            if layer2_repressors:
+                axd["B"].text(3300,26,"$\sigma$ = 0",va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+                axd["B"].text(3300,3.7,"$\sigma$ = 0.05",va="top",ha="left",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+                axd["B"].text(1500,1.2,"$\sigma$ = 0.2",va="bottom",ha="right",fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+
+            axd["B"].set_ylabel("fold-reduction\nchromatin /\nfree DNA")
+            axd["B"].set_ylim([0.8,pow(10,1.5)])
+            axd["B"].text(0.1,0.65,varnames_dict[("layer2_repressors",layer2_repressors)],va="center",ha="left",fontweight="bold",transform=axd["B"].transAxes,
+                          fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+
+            plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == layer2_repressors)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.fluctuation_stackplot_groupby,
+                                     ["ratio_KNS_KS"],
+                                     fontsize=fntsz,ax=[axd["C"],axd["D"]],
+                                     colorbar_leg=False,logxax=True,
+                                     ylabel="excess GEE contribution",
+                                     logyax=False,square=False,
+                                     suppress_leg=True,stackhatch=layer2_repressors,
+                                     varnames_dict=varnames_dict)
+            axd["C"].set_xlabel("")
+            axd["C"].set_xticks([])
+            axd["C"].set_ylabel("")
+            axd["C"].text(220,0.85,f"single-target fluctuations ({varnames_dict[('layer2_repressors',layer2_repressors)]})",va="top",ha="left",
+                          fontsize=round(plot_db.TICK_FONT_RATIO*fntsz),color="w",fontweight="bold")
+            axd["C"].text(220,0.2,"multi-target fluctuations",va="top",ha="left",
+                          fontsize=round(plot_db.TICK_FONT_RATIO*fntsz),color="w",fontweight="bold")
+            axd["C"].text(0.98,0.9,"$\sigma$ = 0.1",va="center",ha="right",transform=axd["C"].transAxes,
+                          fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+
+            axd["D"].xaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
+            axd["D"].set_xticks([200,1000,5000])
+            axd["D"].yaxis.set_label_coords(-0.05,1.05)
+            axd["D"].tick_params(axis="x",pad=10)
+            axd["D"].text(0.98,0.9,"$\sigma$ = 0.1",va="center",ha="right",transform=axd["D"].transAxes,
+                          fontsize=round(plot_db.LEG_FONT_RATIO*fntsz))
+
+            if layer2_repressors:
+                plt.gcf().text(0.035,0.94,"A",fontsize=fntsz,fontweight="bold")
+                plt.gcf().text(0.535,0.94,"B",fontsize=fntsz,fontweight="bold")
+                filename = "fig5"
+            else:
+                filename = "supp_fluc_gee_contrib_A"
+
+            plt.savefig(f"../plots/fig/{filename}.png")
+            plt.close()
+
+
+
+    if GEN_SUPPLEMENTAL:
+        fig, ax = plt.subplots(1,4,figsize=(30,8),layout="tight")
 
         plot_db.subplots_groupby(df_filter_0p1.loc[(df["layer2_repressors"] == 0) &
                                                     (df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)],
@@ -1094,7 +1199,7 @@ def main(argv):
                                  plot_db.scatter_pr_on_fluctuation_groupby,
                                  ["ratio_KNS_KS"],
                                  subtitles=["","free DNA"],
-                                 fontsize=fntsz,ax=[axd["E"],axd["F"]],
+                                 fontsize=fntsz,ax=ax,
                                  colorbar_leg=False,
                                  suppress_leg=True,
                                  varnames_dict=varnames_dict)
@@ -1105,121 +1210,120 @@ def main(argv):
                                  [],[],
                                  plot_db.scatter_pr_on_fluctuation_groupby,
                                  ["ratio_KNS_KS"],
-                                 fontsize=fntsz,ax=[axd["G"],axd["H"]],colorbar_leg=False,
+                                 fontsize=fntsz,ax=ax[2:],colorbar_leg=False,
                                  suppress_leg=True,factors="tf",
                                  varnames_dict=varnames_dict)
 
-
-        plt.gcf().text(0.014,0.965,"A",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.375,0.965,"B",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.685,0.965,"C",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.010,0.430,"D",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.506,0.418,"E",fontsize=fntsz,fontweight="bold")
-
-        plt.savefig(f"../plots/fig/fig5.png")
+        plt.savefig(f"../plots/fig/supp_fluctuation.png")
         plt.close()
 
 
-    # ----- FIGURE 5 (FORMER) ----- #
-    if GEN_FIGURE_5_FORMER:
-        #fig, ax = plt.subplots(2,3,figsize=(42,42),layout="tight")
-        fig = plt.figure(figsize=(20,10),layout="tight")
+        fig, ax = plt.subplots(1,2,figsize=(15,8),layout="tight")
 
-        outer = gs.GridSpec(1,2)
-
-        axd = {"A":plt.subplot(outer[0]),
-               "B":plt.subplot(outer[1])}
-
-        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
-                                               (df_normal["minimize_noncognate_binding"] == 0) &
-                                               (df_normal["MAX_CLUSTERS_ACTIVE"] <= 10)],
-                                 ["ratio_KNS_KS"],
-                                 [],[],
-                                 plot_db.colorscatter_2d_groupby,
-                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
-                                 plot_db.rms_patterning_error,
-                                 ax=[axd["A"]],fontsize=fntsz,
-                                 subtitles=[""],
-                                 suppress_leg=True,draw_lines=True,
-                                 ylabel="GEE",
-                                 varnames_dict=varnames_dict)
-        #axd["A"].set_yscale("log")
-        #axd["A"].yaxis.set_minor_formatter(ticker.NullFormatter())
-        axd["A"].set_xticks([100,150,250,500,1000])
-        axd["A"].xaxis.set_major_formatter(ticker.ScalarFormatter())
-        axd["A"].xaxis.set_minor_formatter(ticker.NullFormatter())
-        axd["A"].set_yticks([0,0.02,0.04])
-
-        def numon(vals,cols):
-            N_ON = 10*vals[cols[2]]
-            M = vals[cols[3]]
-            vals[cols[3]] = N_ON # x-axis
-            vals[cols[2]] = N_ON.div(M) # marker sizing
-            return vals
-
-        def hundred_percent_on(df):
-            d = plot_db.rms_patterning_error(df)
-            fraction_on = df["MAX_CLUSTERS_ACTIVE"].div(df["N_CLUSTERS"],axis=0)
-            d.loc[fraction_on < 1] = None
-            return d
-
-        def rel_to_hundred_percent_on(df,refs):
-            d = plot_db.rms_patterning_error(df)
-            return d.div(df["M_GENE"].map(refs))
-
-        def get_refs(df):
-            fraction_on = df["MAX_CLUSTERS_ACTIVE"].div(df["N_CLUSTERS"],axis=0)
-            new_df = df.loc[fraction_on == 1]
-            gb = new_df.groupby("M_GENE",group_keys=True)
-            gbn = gb.apply(plot_db.rms_patterning_error)
-            gbn = gbn.groupby("M_GENE",group_keys=True)
-            return gbn.mean().to_dict()
-
-        dfoi = df_normal.loc[(df_normal["ratio_KNS_KS"] == 1000) &
-                             (df_normal["minimize_noncognate_binding"] == 0)]
-        #refs = get_refs(dfoi)
-        
-        plot_db.subplots_groupby(dfoi,
-                                 ["ratio_KNS_KS"],
-                                 [],[],
-                                 plot_db.colorscatter_2d_groupby,
-                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
-                                 plot_db.rms_patterning_error,#lambda x: rel_to_hundred_percent_on(x,refs),
-                                 ax=[axd["B"]],fontsize=fntsz,
-                                 suppress_leg=True,draw_lines=False,
-                                 subtitles=[""],
-                                 transform_columns=numon,
-                                 ylabel="GEE",# / max RMSE for M genes",
-                                 varnames_dict=varnames_dict)
-        axd["B"].set_xscale("log")
-        axd["B"].set_yscale("log")
-        axd["B"].set_xlabel("number of ON genes")
-
-        plt.gcf().text(0.012,0.920,"A",fontsize=fntsz,fontweight="bold")
-        plt.gcf().text(0.512,0.920,"B",fontsize=fntsz,fontweight="bold")
-
-        plt.savefig("../plots/fig/fig5_former.png")
-        plt.close()
-
-
-
-    if GEN_SUPPLEMENTAL:
-        fig, ax = plt.subplots(2,2,figsize=(20,20),layout="tight")
-        fig.delaxes(ax[1][0])
-        fig.delaxes(ax[1][1])
-
-        plot_db.subplots_groupby(df_filter_0p1.loc[(df["layer2_repressors"] == 0) &
+        plot_db.subplots_groupby(df_filter_0p1.loc[(df["layer2_repressors"] == 1) &
                                                     (df["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES)],
                                  "tf_first_layer",
                                  [],[],
                                  plot_db.scatter_pr_on_fluctuation_groupby,
                                  ["ratio_KNS_KS"],
-                                 subtitles=["",""],
-                                 fontsize=fntsz,ax=ax,colorbar_leg=False,
-                                 suppress_leg=True,factors="tf",
+                                 subtitles=["","free DNA"],
+                                 fontsize=fntsz,ax=ax,
+                                 sdefault=20,
+                                 colorbar_leg=False,
+                                 suppress_leg=True,
                                  varnames_dict=varnames_dict)
 
-        plt.savefig(f"../plots/fig/supp_fluctuation.png")
+        plt.savefig(f"../plots/fig/supp_fluctuation_repressors.png")
+        plt.close()
+
+
+        fig, ax = plt.subplots(1,2,figsize=(20,10),layout="tight")
+
+        def plot_scatter_fluc(ax,layer2_repressors):
+            plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == layer2_repressors) &
+                                                   (df_filter_0p1["tf_first_layer"] == 0)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.scatter_fluctuation_groupby,
+                                     ["ratio_KNS_KS"],
+                                     subtitles=[""],gray_cb=True,
+                                     fontsize=fntsz,ax=[ax],
+                                     varnames_dict=varnames_dict)
+            plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == layer2_repressors) &
+                                                   (df_filter_0p1["tf_first_layer"] == 1)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.scatter_fluctuation_groupby,
+                                     ["ratio_KNS_KS"],
+                                     subtitles=[""],
+                                     suppress_leg=True,colorbar_leg=False,
+                                     fontsize=fntsz,ax=[ax],
+                                     varnames_dict=varnames_dict)
+            ax.set_xticks([1e-1,1e-2])
+            ax_inset = ax.inset_axes((0.55,0.08,insetsz,insetsz))
+            plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == layer2_repressors)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.scatter_fluctuation_groupby,
+                                     ["ratio_KNS_KS"],normalize=True,
+                                     subtitles=["",""],
+                                     fontsize=insetfntsz,ax=[ax_inset,ax_inset],
+                                     suppress_leg=True,colorbar_leg=False,
+                                     varnames_dict=varnames_dict)
+            ax_inset.set_xticks([0.9,1])
+            ax_inset.set_yticks([0,0.5,1])
+            ax_inset.set_xlabel("")
+            ax_inset.set_ylabel("")
+            ax_inset.set_title("normalized\nGEE")
+
+        plot_scatter_fluc(ax[0],0)
+        plot_scatter_fluc(ax[1],1)
+
+        plt.savefig(f"../plots/fig/supp_fluc_scatter.png")
+        plt.close()
+
+
+        fig, ax = plt.subplots(1,1,figsize=(20,10),layout="tight")
+
+        plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == 0) &
+                                                   (df_filter_0p1["ratio_KNS_KS"] == 500)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.fluctuation_barchart_groupby,
+                                 ["tf_first_layer"],
+                                 subtitles=[""],
+                                 fontsize=fntsz,ax=[ax],
+                                 colorbar_leg=False,
+                                 varnames_dict=varnames_dict)
+        plt.savefig(f"../plots/fig/temp_fluc_barchart.png")
+        plt.close()
+
+
+        fig, ax = plt.subplots(1,2,figsize=(20,10),layout="tight")
+        def plot_scatter_quad(ax,layer2_repressors):
+            plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == layer2_repressors) &
+                                                   (df_filter_0p1["tf_first_layer"] == 0)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.scatter_fluctuation_quad_groupby,
+                                     ["ratio_KNS_KS"],
+                                     subtitles=[""],gray_cb=True,
+                                     fontsize=fntsz,ax=[ax],
+                                     varnames_dict=varnames_dict)
+            plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["layer2_repressors"] == layer2_repressors) &
+                                                   (df_filter_0p1["tf_first_layer"] == 1)],
+                                     ["tf_first_layer"],
+                                     [],[],
+                                     plot_db.scatter_fluctuation_quad_groupby,
+                                     ["ratio_KNS_KS"],
+                                     subtitles=[""],
+                                     suppress_leg=True,colorbar_leg=False,
+                                     fontsize=fntsz,ax=[ax],
+                                     varnames_dict=varnames_dict)
+        plot_scatter_quad(ax[0],0)
+        plot_scatter_quad(ax[1],1)
+
+        plt.savefig(f"../plots/fig/temp_fluc_quad.png")
         plt.close()
 
 
@@ -1244,7 +1348,7 @@ def main(argv):
                                  [],[],
                                  plot_db.colorscatter_2d_groupby,
                                  ["tf_first_layer","layer2_repressors","MAX_CLUSTERS_ACTIVE","ratio_KNS_KS"],
-                                 plot_db.get_mean_fluctuation,
+                                 plot_db.get_mean_fluctuation_rmse,
                                  ax=[ax[0][0]],fontsize=fntsz,draw_lines=True,markeralpha=1,
                                  size_lims=[500,500],
                                  subtitles=[""],ylabel="GEE",
@@ -1252,7 +1356,7 @@ def main(argv):
         ax[0][0].set_yscale("log")
 
         def fluctuation_plot_fn(x):
-            fluctuation_all = plot_db.get_mean_fluctuation(x)
+            fluctuation_all = plot_db.get_mean_fluctuation_rmse(x)
             return np.divide(fluctuation_all,x["actual_patterning_error"])
 
         plot_db.subplots_groupby(df_filter,
@@ -1272,7 +1376,7 @@ def main(argv):
                                  [],[],
                                  plot_db.symbolscatter_groupby,
                                  ["ratio_KNS_KS","tf_first_layer"],
-                                 plot_db.get_mean_fluctuation,
+                                 plot_db.get_mean_fluctuation_rmse,
                                  ax=[ax[1][0]],suppress_leg=True,
                                  subtitles=[""],fontsize=fntsz,
                                  take_ratio=True,ylabel="fold-reduction",logyax=True,
@@ -1282,7 +1386,7 @@ def main(argv):
                                  [],[],
                                  plot_db.symbolscatter_groupby,
                                  ["ratio_KNS_KS","tf_first_layer"],
-                                 plot_db.get_mean_fluctuation,
+                                 plot_db.get_mean_fluctuation_rmse,
                                  ax=[ax[1][0]],suppress_leg=True,
                                  subtitles=[""],fontsize=fntsz,
                                  take_ratio=True,ylabel="fold-reduction",logyax=True,
@@ -1358,8 +1462,8 @@ def main(argv):
         plt.close()
 
     if GEN_DIST_TEST:
-        df_test = df.loc[(df["M_GENE"] == m_gene) &
-                         (df["MAX_CLUSTERS_ACTIVE"] == maxclust) &
+        df_test = df.loc[(df["M_GENE"] == M_GENE) &
+                         (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
                          (df["minimize_noncognate_binding"] == 0) &
                          (df["target_independent_of_clusters"] == 0) &
                          (df["ignore_off_during_optimization"] == 0) &
@@ -1417,12 +1521,10 @@ def main(argv):
         #fig.delaxes(ax[1][0])
         #fig.delaxes(ax[1][1])
 
+        
         """
-        plot_db.subplots_groupby(df_filter_0p1.loc[(df_filter_0p1["minimize_noncognate_binding"] == 0) &
-                                        (df_filter_0p1["M_GENE"] == m_gene) &
-                                        (df_filter_0p1["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_filter_0p1["layer2_repressors"] == 0) &
-                                        (df_filter_0p1["target_distribution"] == "uni")],
+        plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["layer2_repressors"] == 0) &
+                                                    (df_fluctuation["sigma"] == 1)],
                                  ["tf_first_layer"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
@@ -1430,27 +1532,21 @@ def main(argv):
                                  fontsize=fntsz,ax=ax[0,:],
                                  varnames_dict=varnames_dict)
 
-        plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["M_GENE"] == m_gene) &
-                                        (df_fluctuation["MAX_CLUSTERS_ACTIVE"] == maxclust) &
-                                        (df_fluctuation["minimize_noncognate_binding"] == 0) &
-                                        (df_fluctuation["target_independent_of_clusters"] == 0) &
-                                        (df_fluctuation["ignore_off_during_optimization"] == 0) &
-                                        (df_fluctuation["layer2_repressors"] == 0) &
-                                        (df_fluctuation["MIN_EXPRESSION"] < 0.01) &
-                                        (df_fluctuation["target_distribution"] == "uni")],
+        plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["layer2_repressors"] == 0) &
+                                                    (df_fluctuation["sigma"] == 0.1)],
                                  ["tf_first_layer"],
                                  [],[],
                                  plot_db.scatter_target_expression_groupby,
                                  ["ratio_KNS_KS"],
-                                 fontsize=fntsz,ax=ax[1,:],
+                                 fontsize=fntsz,ax=ax[0,2:],
                                  varnames_dict=varnames_dict)
-        """
+       
         plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["layer2_repressors"] == 0)],
                                  ["tf_first_layer"],
                                  [],[],
                                  plot_db.barchart_groupby,
                                  ["ratio_KNS_KS","sigma"],
-                                 lambda x: np.sqrt(x["fun"]/m_gene),
+                                 lambda x: np.sqrt(x["fun"]/M_GENE),
                                  fontsize=fntsz,ax=ax[0,:],
                                  varnames_dict=varnames_dict)
         plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["layer2_repressors"] == 1)],
@@ -1458,26 +1554,165 @@ def main(argv):
                                  [],[],
                                  plot_db.barchart_groupby,
                                  ["ratio_KNS_KS","sigma"],
-                                 lambda x: np.sqrt(x["fun"]/m_gene),
+                                 lambda x: np.sqrt(x["fun"]/M_GENE),
                                  fontsize=fntsz,ax=ax[0,2:],
                                  varnames_dict=varnames_dict)
 
-        plot_db.subplots_groupby(df_fluctuation,
-                                 ["sigma","layer2_repressors"],
+        plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["layer2_repressors"] == 0)],
+                                 ["sigma"],
                                  [],[],
                                  plot_db.symbolscatter_groupby,
                                  ["ratio_KNS_KS","tf_first_layer"],
-                                 lambda x: np.sqrt(x["fun"]/m_gene),
-                                 ax=[ax[1,0],ax[1,1],ax[1,0],ax[1,1]],suppress_leg=True,
+                                 lambda x: np.sqrt(x["fun"]/M_GENE),
+                                 ax=ax[1,:],suppress_leg=True,
                                  fontsize=fntsz,#linewidth=2,markersize=10,
                                  take_ratio=True,ylabel="GEE fold-reduction chromatin / free DNA",logyax=True,
-                                 markers=["v"],
+                                 markers=["v"],force_color=True,color=plot_db.color_dict["activators only"],
+                                 varnames_dict=varnames_dict)
+        plot_db.subplots_groupby(df_fluctuation.loc[(df_fluctuation["layer2_repressors"] == 1)],
+                                 ["sigma"],
+                                 [],[],
+                                 plot_db.symbolscatter_groupby,
+                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 lambda x: np.sqrt(x["fun"]/M_GENE),
+                                 ax=ax[1,:],suppress_leg=True,
+                                 fontsize=fntsz,#linewidth=2,markersize=10,
+                                 take_ratio=True,ylabel="GEE fold-reduction chromatin / free DNA",logyax=True,
+                                 markers=["v"],force_color=True,color=plot_db.color_dict["with repressors"],
                                  varnames_dict=varnames_dict)
 
 
         plt.savefig(f"../plots/fig/test_fluctuation_res.png")
         plt.close()
+        """
+    if GEN_SENSITIVITY:
+        fig, ax = plt.subplots(1,2,figsize=(20,10),layout="tight")
+
+        plot_db.subplots_groupby(df_sensitivity.loc[(df_sensitivity["rm"] == 0.0002) &
+                                                    (df["GENES_PER_CLUSTER"] == 10) &
+                                                    (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                                    (df["tf_first_layer"] == False)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["k_neq","tf_first_layer"],
+                                 ax=[ax[0]],
+                                 subtitles=["",""],
+                                 suppress_leg=True,
+                                 fontsize=fntsz,ylabel="GEE",
+                                 legloc="best",bbox_to_anchor=[0.48,0,0.47,0.47],
+                                 varnames_dict=varnames_dict)
+
+        plot_db.subplots_groupby(df_sensitivity.loc[(df_sensitivity["k_neq"] == 0.05) &
+                                                    (df["GENES_PER_CLUSTER"] == 10) &
+                                                    (df["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                                    (df["tf_first_layer"] == False)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["rm","tf_first_layer"],
+                                 ax=[ax[1]],
+                                 subtitles=["",""],
+                                 suppress_leg=True,
+                                 fontsize=fntsz,ylabel="GEE",
+                                 legloc="best",bbox_to_anchor=[0.48,0,0.47,0.47],
+                                 varnames_dict=varnames_dict)
+
+        plt.savefig(f"../plots/fig/test_sensitivity.png")
+        plt.close()
+    if GEN_CLUSTERS:
+        def transf(vals,cols):
+            temp_vals = vals
+            vals["temp_barchart_fn"] = temp_vals[cols[2]]
+            vals[cols[2]] = temp_vals["temp_barchart_fn"]
+            return vals
+        fig, ax = plt.subplots(1,3,figsize=(30,10),layout="tight")
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["ratio_KNS_KS"] == RATIO_FOR_SINGLE_EXAMPLES) &
+                                        (df_normal["minimize_noncognate_binding"] == 0)],
+                                 ["tf_first_layer"],
+                                 [],[],
+                                 plot_db.colorscatter_2d_groupby,
+                                 ["tf_first_layer","minimize_noncognate_binding","MAX_CLUSTERS_ACTIVE","M_GENE"],
+                                 plot_db.rms_patterning_error,
+                                 ax=ax[:],normalize=False,
+                                 transform_columns=transf,
+                                 fontsize=fntsz,ylabel="number of active clusters",
+                                 suppress_leg=True,
+                                 varnames_dict=varnames_dict)
+        plot_db.subplots_groupby(df_sensitivity.loc[(df_sensitivity["k_neq"] == 0.05) &
+                                                    (df_sensitivity["rm"] == 0.0002)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["GENES_PER_CLUSTER","tf_first_layer"],
+                                 ax=[ax[2]],
+                                 subtitles=["",""],
+                                 fontsize=fntsz,ylabel="GEE",
+                                 suppress_leg=True,
+                                 varnames_dict=varnames_dict)
+
+        plt.savefig(f"../plots/fig/test_clusters.png")
+        plt.close()
+    if GEN_NO_NONTARGET:
+        fig, ax = plt.subplots(1,1,figsize=(10,10),layout="tight")
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df_normal["M_GENE"] == M_GENE)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.barchart_groupby,
+                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 f=plot_db.calc_rms_no_nontarget,
+                                 ax=[ax],
+                                 subtitles=["",""],
+                                 fontsize=fntsz,ylabel="GEE",
+                                 suppress_leg=True,darken_color=True,
+                                 varnames_dict=varnames_dict)
+        plot_db.subplots_groupby(df_normal.loc[(df_normal["minimize_noncognate_binding"] == 0) &
+                                        (df_normal["MAX_CLUSTERS_ACTIVE"] == MAXCLUST) &
+                                        (df_normal["M_GENE"] == M_GENE)],
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 ax=[ax],
+                                 subtitles=["",""],
+                                 fontsize=fntsz,ylabel="GEE",
+                                 suppress_leg=True,
+                                 varnames_dict=varnames_dict)
         
+        plt.savefig(f"../plots/fig/test_no_nontarget.png")
+        plt.close()
+    if GEN_EXTENDED_KBT:
+        """
+        fig, ax = plt.subplots(1,1,figsize=(20,10),layout="tight")
+        plot_db.subplots_groupby(df_extended,
+                                 ["M_GENE"],
+                                 [],[],
+                                 plot_db.rms_barchart_groupby,
+                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 ax=[ax],
+                                 subtitles=["",""],
+                                 fontsize=fntsz,ylabel="GEE",
+                                 legloc="upper right",
+                                 varnames_dict=varnames_dict)
+        ax.set_yscale("log")
+        """
+        fig, ax = plt.subplots(1,1,figsize=(10,10),layout="tight")
+        plot_db.subplots_groupby(df_extended,
+                                 "M_GENE",
+                                 [],[],
+                                 plot_db.symbolscatter_groupby,
+                                 ["ratio_KNS_KS","tf_first_layer"],
+                                 plot_db.rms_patterning_error,
+                                 ax=[ax],suppress_leg=True,
+                                 subtitles=[""],fontsize=insetfntsz,#linewidth=2,markersize=10,
+                                 take_ratio=False,ylabel="GEE",
+                                 logxax=True,logyax=True,
+                                 varnames_dict=varnames_dict)
+        ax.set_xlim([10,1000000])
+        plt.savefig(f"../plots/fig/test_extended_kbt.png")
+        plt.close()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
