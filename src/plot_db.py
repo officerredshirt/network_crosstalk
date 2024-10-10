@@ -435,6 +435,8 @@ def subplots_groupby(df,supercol,filename,title,plotfn,*args,
         plt.savefig(filename)
         plt.close()
 
+def print_gr_test(gr):
+    print(f"{gr.name}: {len(gr)}")
 
 def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],
                           ax=[],ylabel="mean",fontsize=24,
@@ -446,6 +448,9 @@ def symbolscatter_groupby(df,cols,f,title="",filename="",varnames_dict=[],
     if not ((len(cols) > 1) & (len(cols) < 4)):
         print("symbolscatter_groupby requires 2 or 3 cols")
         sys.exit()
+
+    temp = df.groupby(cols,group_keys=True)
+    temp.apply(print_gr_test)
 
     try:
         df["temp_barchart_fn"] = f(df)
@@ -1202,6 +1207,10 @@ def expression_distribution_groupby(df,cols,title="",filename="",varnames_dict=[
     def plot_one(gr):
         target_pattern_vals = np.array(gr["target_pattern"].to_list()).flatten()
 
+        print(set(gr["target_distribution"]))
+        print(set(gr["filename"]))
+        print(len(gr.loc[gr["tf_first_layer"] == False]))
+        print(len(gr.loc[gr["tf_first_layer"] == True]))
         chromatin_actual_exp = np.array(gr["output_expression"][gr["tf_first_layer"] == False].to_list()).flatten()
         chromatin_target_vals = np.array(gr["target_pattern"][gr["tf_first_layer"] == False].to_list()).flatten()
 
@@ -1499,6 +1508,7 @@ def scatter_target_expression_groupby(df,cols,title="",filename="",varnames_dict
         ax.plot(0,np.mean(manage_db.logical_ix(actual_expression,target_pattern_vals == 0)),
                    color=colordict[gr.name],marker='X',markersize=20,clip_on=False,zorder=10)
 
+    gb.apply(print_gr_test)
     gb.apply(scatter_one)
 
     ax.set_xlabel("target expression",fontsize=fontsize)

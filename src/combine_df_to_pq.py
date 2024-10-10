@@ -42,10 +42,20 @@ def main(argv):
     df = df.loc[df["K_NS"] > 100]
     df = df.loc[df["success"] == 1]
     #df.reset_index(inplace=True)
-    ix_to_drop = df.loc[:,df.columns != "filename"].astype(str).drop_duplicates().index
+
+    #ix_to_drop = df.loc[:,df.columns != "filename"].astype(str).drop_duplicates().index
+    #print(f"Dropping {len(df)-len(ix_to_drop)} duplicate indices...")
+    #df = df.loc[ix_to_drop]
+    colnames = df.columns.values
+    colnames_to_ignore = ["filename","nsamp","optimized_input","output_expression",
+                          "output_error","max_expression","fun","jac",
+                          "message","nfev","nit","njev","status","success",
+                          "modulating_concentrations","error_metric_post_modulation"]
+    remaining_cols = list(filter(lambda x: x not in colnames_to_ignore, colnames))
+    ix_to_drop = df.loc[:,remaining_cols].astype(str).drop_duplicates(keep="first").index
     print(f"Dropping {len(df)-len(ix_to_drop)} duplicate indices...")
     df = df.loc[ix_to_drop]
-    df = plot_db.calc_modulating_concentrations(df)
+    #df = plot_db.calc_modulating_concentrations(df)
 
     print("Saving...")
     df.to_parquet(COMBINED_RESULTS)

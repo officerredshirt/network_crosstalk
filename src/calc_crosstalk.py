@@ -37,7 +37,7 @@ def main(argv):
     parser.add_argument("-t","--tf_first_layer",action="store_true",default=False)
     parser.add_argument("-c","--minimize_noncognate_binding",action="store_true",default=False)
     parser.add_argument("-s","--suppress_filesave",action="store_true",default=False)
-    parser.add_argument("-r","--redo_unsuccessful",action="store_true",default=False)
+    parser.add_argument("-r","--redo_unsuccessful",action="store_true",default=True)
 
     args = parser.parse_args()
     filename_in = args.filename_in
@@ -51,6 +51,32 @@ def main(argv):
     redo_unsuccessful = args.redo_unsuccessful
     
     local_id = manage_db.extract_local_id(filename_in)
+
+    # default possibly nonexistent parameters
+    def var_exists(x):
+        return x in locals() or x in globals()
+
+    if ~var_exists("sigma"):
+        sigma = 0
+        sigma_PF = 0
+        sigma_TF = 0
+        nsamp = 10
+    
+    if ~var_exists("target_distribution"):
+        target_distribution = "uni"
+
+    if ~var_exists("target_independent_of_clusters"):
+        target_independent_of_clusters = False
+
+    if ~var_exists("layer2_repressors"):
+        layer2_repressors = False
+
+    if ~var_exists("ignore_off_during_optimization"):
+        ignore_off_during_optimization = False
+
+    if ~var_exists("concentration_penalty"):
+        concentration_penalty = False
+        cp = 1e-1
 
     # load target patterns
     input_for_target, target_patterns = manage_db.get_target_patterns(database,local_id)
@@ -109,7 +135,8 @@ def main(argv):
 
             #try:
             optres = optimize.minimize(crosstalk_objective_fn, c_0, tol = eps, bounds = bnds,
-                                       method = "L-BFGS-B", options = {"maxfun":1000000})
+                                       method = "L-BFGS-B", options = {"maxfun":1000000000,
+                                                                       "maxls":50})
 
             if (not target_independent_of_clusters) and (not layer2_repressors):
                 optres.x = concatenate((optres.x[0:N_PF_to_use],zeros(N_PF - N_PF_to_use),

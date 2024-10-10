@@ -609,6 +609,7 @@ def query_db(db_filename,query):
 
     res = cur.execute(query).fetchall()
 
+    con.commit()
     con.close()
     return res
 
